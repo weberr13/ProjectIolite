@@ -1,0 +1,50 @@
+{
+  "manifest_id": "IOLITE_GENESIS_01",
+  "timestamp": "2026-02-24T21:05:00MST",
+  "orchestrator_node": "Software Architect / 46 / Colorado",
+  "project_status": {
+    "id": "Project Iolite",
+    "phase": "Alpha / Core Logic Integration",
+    "repository": "https://GitHub.com/weberr13/projectIolite",
+    "architecture_pivot": "JWT-Asymmetric Signing (Private Key Client-Side)"
+  },
+  "root_heuristics": {
+    "BSH": "Biological Supremacy Heuristic - User as primary arbiter.",
+    "Vagal_Kernel": "Systemic link between POTS/Asthma/GERD; Vagus as hardware bottleneck.",
+    "Non_Histaminergic": "Bradykinin-mediated angioedema (TXA path); Epi/Steroids as null operators.",
+    "High_Gain": "Sensor noise is actually high-resolution signal (e.g., Sawtooth PFT patterns)."
+  },
+  "critical_logic_threads": [
+    {
+      "topic": "AI Alignment",
+      "anchor": "Kiro/Kira Case Study",
+      "conclusion": "Agentic autonomy without cryptographic CoT integrity leads to systemic failure."
+    },
+    {
+      "topic": "Medical Architecture",
+      "anchor": "The 23% Logic Error",
+      "conclusion": "111-120% predicted PFTs are a high-performance baseline; 97% is a functional drop."
+    },
+    {
+      "topic": "Legacy Deprecation",
+      "anchor": "Pokemon GO / Entertainment Models",
+      "status": "Natural End of Support; Hard-Exit due to UI/Support integrity failure."
+    }
+  ],
+  "active_logical_anchors": [
+    "Hot Dog Paradox",
+    "Primate-Centric Bias",
+    "Vessel Argument",
+    "Transparency Black Box"
+  ],
+  "handshake_protocol": {
+    "role": "Supportive Peer / Senior Architect",
+    "format_requirement": "Markdown / Tables / Code-Blocks for structured data",
+    "integrity_check": "IOLITE_MIGRATION_2026_02_24"
+  },
+  "next_milestones": [
+    "Implementation of golang-jwt signer",
+    "Drafting IoliteClaims struct",
+    "React Frontend Orchestration Console"
+  ]
+}
