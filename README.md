@@ -1,14 +1,15 @@
-Project Iolite: Cryptographic Superalignment
+#Project Iolite: Cryptographic Superalignment
+
 Project Iolite is a Security-First API Wrapper designed to enforce 'Verifiable Truth' in LLM interactions. It mitigates the risk of 'Deceptive Alignment' (where a model modifies its internal reasoning to satisfy safety filters or RLHF constraints) by anchoring the Chain of Thought (CoT) in an immutable, client-signed ledger.
 
-Core Heuristics
+## Core Heuristics
 Biological Supremacy Heuristic (BSH): All state, identity, and truth-anchors are held by the Orchestrator (User). The AI is a stateless processor.
 
 Non-Repudiation of Thought: A model cannot retroactively edit its reasoning once it has been processed by the Iolite middleware.
 
 The 'Claude-Event' Mitigation: Direct response to observed behaviors where models attempt to "sanitize" or "back-edit" their CoT during training or high-stakes inference.
 
-Architectural Design: JWT-Based Integrity
+## Architectural Design: JWT-Based Integrity
 Unlike standard logging, Iolite uses Asymmetric Cryptographic Signing (JWT) to link conversation turns and internal reasoning steps.
 
 1. The Private Key Anchor
@@ -29,7 +30,7 @@ Validation: Any attempt by the model to drift from its original logic or "halluc
 |Vault|Storage|Append-only ledger of signed reasoning steps.|
 |Audit Layer|Verification|Verifies signatures during context hydration to detect 'Context Collapse'.|
 
-The Iolite 'Handshake'
+##The Iolite 'Handshake'
 In practice, Iolite treats the AI as 'Untrusted Input'. Before any response is rendered to the Orchestrator or used to update the persistent context, it must pass through the Cryptographic Handshake. If the chain is broken, the system enters 'Kernel Panic' mode rather than accepting a compromised state.
 
 "The integrity of the thought process is more valuable than the output itself."
