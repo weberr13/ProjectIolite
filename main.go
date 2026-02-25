@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/weberr13/ProjectIolite/brain"
+	"github.com/weberr13/ProjectIolite/claude"
+	"github.com/weberr13/ProjectIolite/gemini"
 	"github.com/weberr13/ProjectIolite/jwtwrapper"
 )
 
@@ -35,15 +37,22 @@ func main() {
 		cancel()
 	}()
 
-
 	// TODO: Persist and reload these at start if specified in flags
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
-    if err != nil {
-        panic(err)
-    }
+	if err != nil {
+		panic(err)
+	}
 
 	sv := jwtwrapper.New(pub, priv)
-	backend, err := brain.NewWhole(brain.WithSignVerifier(sv),brain.WithRightBrain("not a brain"))
+	gemini, err := gemini.New(os.Getenv("GEMINI_API_KEY"))
+	if err != nil {
+		panic(err)
+	}
+	claude, err := claude.New()
+	if err != nil {
+		panic(err)
+	}
+	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(gemini), brain.WithLeftBrain(claude))
 	if err != nil {
 		panic(err)
 	}
