@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -151,16 +152,19 @@ func (b *Whole) Ready() error {
 func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 	switch {
 	case b.left == nil && b.right == nil:
+		log.Printf("tried to think but no brains detected")
 		return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
 	case b.left == nil:
 		resp, err := b.right.Think(ctx, b.signVerifier, Request{t: prompt})
 		if err != nil {
+			log.Printf("tried to right think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
 		}
 		return b.right.Evaluate(ctx, b.signVerifier, resp, nil)
 	case b.right == nil:
 		resp, err := b.left.Think(ctx, b.signVerifier, Request{t: prompt})
 		if err != nil {
+			log.Printf("tried to left think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
 		}
 		return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
@@ -181,6 +185,7 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 
 	// in case 3 there will be a program counter for how many "back and forth" exchanges are permitted before the
 	// last result "wins" (a small number)
+	log.Printf("tried to dual think but we failed")
 	return &ErrorDecision{
 		E: ErrNotImplemented,
 	}, ErrNotImplemented
@@ -201,10 +206,12 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 				// * allow them to "ruminate" on old prompts that are resolved but high interest (entropy values?)
 			case q := <-b.queries:
 				func(appCtx context.Context, q Query) {
+					log.Printf("received query %#v", q)
 					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime)
 					defer cancel()
 					d, err := b.Think(ctx, q.input)
 					if err != nil {
+						log.Printf("could not think: %#v, %s", d, err)
 						d = &ErrorDecision{
 							E: err,
 						}
@@ -217,4 +224,22 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 			}
 		}
 	}()
+}
+
+// Push sends a query to the brain and waits for the decision.
+// It respects the internal maxQueryTime for the think loop.
+func (b *Whole) Push(ctx context.Context, input string) (Decision, error) {
+	c := make(chan Decision, 1)
+	select {
+	case b.queries <- Query{input: input, C: c}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	select {
+	case d := <-c:
+		return d, d.Verify(b.signVerifier)
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }

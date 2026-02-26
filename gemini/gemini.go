@@ -2,7 +2,9 @@ package gemini
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"log"
 
 	"google.golang.org/genai"
 
@@ -57,7 +59,11 @@ func New(ctx context.Context, apikey string, opts ...Option) (*Gemini, error) {
 }
 
 func (g *Gemini) genConfig() *genai.GenerateContentConfig {
-	return nil // Do something here???
+	return &genai.GenerateContentConfig{
+		ThinkingConfig: &genai.ThinkingConfig{
+			IncludeThoughts: true,
+		},
+	}
 }
 
 // Think generates the initial response
@@ -82,17 +88,29 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 
 // Evaluate audits another brain's output
 func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, prev brain.Decision) (brain.Decision, error) {
+	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
+	if prev != nil {
+		s, _ := json.MarshalIndent(prev, " ", " ")
+		log.Printf("adding to existing Decision %s", s)
+	}
 	cfg := g.genConfig()
 	cfg.Temperature = &HighTemp
 	cfg.ThinkingConfig.ThinkingLevel = genai.ThinkingLevelHigh
 	cfg.TopP = &NarrowTopP
-	cfg.CandidateCount = 3
+	// if strings.Contains(g.model, "gemini-pro") {
+	// 	cfg.CandidateCount = 3
+	// } else {
+	cfg.CandidateCount = 1
+	// }
 
-	result, err := g.cl.Models.GenerateContent(ctx, g.model, genai.Text(peerOutput.Describe(sv)), cfg)
+	result, err := g.cl.Models.GenerateContent(ctx, "gemini-pro-latest", genai.Text(peerOutput.Describe(sv)), cfg)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
+	s, _ := json.MarshalIndent(result, " ", " ")
+	log.Printf("got result: %s", s)
 	if prev == nil {
+		log.Printf("creating new decision struct")
 		prev, err = NewDecision(peerOutput, sv)
 		if err != nil {
 			return nil, err
