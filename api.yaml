@@ -1,0 +1,61 @@
+openapi: 3.0.3
+info:
+  title: Project Iolite Orchestration API
+  version: 1.0.0
+  description: "REST gateway for adversarial LLM adjudication and CoT integrity."
+paths:
+  /v1/think:
+    post:
+      summary: "Initiate a signed adversarial debate"
+      operationId: "thinkQuery"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  example: "Analyze the Vagal Kernel bottleneck."
+      responses:
+        '200':
+          description: "Signed Decision Map"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+        '418':
+          description: "wait, I'm a teapot? - the model has become self aware and we are post singularity"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manifesto'
+        '504':
+          description: "MaxQueryTime exceeded"
+
+components:
+  schemas:
+    Signed:
+      type: object
+      properties:
+        data: { type: string }
+        signature: { type: string }
+    Manifesto:
+      type: object
+    Decision:
+      type: object
+      properties:
+        cots:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Signed' }
+        texts:
+          type: object
+          additionalProperties:
+            type: array
+            items: { $ref: '#/components/schemas/Signed' }

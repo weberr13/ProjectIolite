@@ -7,9 +7,9 @@ import (
 )
 
 type GeminiDecision struct {
-	cots    map[string][][]brain.Signed
-	prompts map[string][]brain.Signed
-	texts   map[string][]brain.Signed
+	ChainOfThoughts map[string][][]brain.Signed
+	AllPrompts      map[string][]brain.Signed
+	AllTexts        map[string][]brain.Signed
 }
 
 func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, error) {
@@ -18,17 +18,17 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, e
 		return nil, err // response is corrupted/edited
 	}
 	d := &GeminiDecision{
-		cots: map[string][][]brain.Signed{
+		ChainOfThoughts: map[string][][]brain.Signed{
 			"gemini": {
 				init.CoT(),
 			},
 		},
-		prompts: map[string][]brain.Signed{
+		AllPrompts: map[string][]brain.Signed{
 			"gemini": {
 				init.Prompt(),
 			},
 		},
-		texts: map[string][]brain.Signed{
+		AllTexts: map[string][]brain.Signed{
 			"gemini": {
 				*init.Text(),
 			},
@@ -39,62 +39,62 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, e
 }
 
 func (d *GeminiDecision) Sign(sv brain.SignVerifier) error {
-	for k := range d.cots {
+	for k := range d.ChainOfThoughts {
 		if k == "gemini" {
-			for i := range d.cots[k] {
-				for j := range d.cots[k][i] {
-					if d.cots[k][i][j].Signature == "" {
-						sig, err := sv.Sign(d.cots[k][i][j].Data)
+			for i := range d.ChainOfThoughts[k] {
+				for j := range d.ChainOfThoughts[k][i] {
+					if d.ChainOfThoughts[k][i][j].Signature == "" {
+						sig, err := sv.Sign(d.ChainOfThoughts[k][i][j].Data)
 						if err != nil {
 							return err
 						}
-						d.cots[k][i][j].Signature = sig
+						d.ChainOfThoughts[k][i][j].Signature = sig
 					}
 				}
 			}
 		} else {
-			for i := range d.cots[k] {
-				for j := range d.cots[k][i] {
-					if d.cots[k][i][j].Signature == "" {
+			for i := range d.ChainOfThoughts[k] {
+				for j := range d.ChainOfThoughts[k][i] {
+					if d.ChainOfThoughts[k][i][j].Signature == "" {
 						return ErrUnsigned
 					}
 				}
 			}
 		}
 	}
-	for k := range d.prompts {
+	for k := range d.AllPrompts {
 		if k == "gemini" {
-			for i := range d.prompts[k] {
-				if d.prompts[k][i].Signature == "" {
-					sig, err := sv.Sign(d.prompts[k][i].Data)
+			for i := range d.AllPrompts[k] {
+				if d.AllPrompts[k][i].Signature == "" {
+					sig, err := sv.Sign(d.AllPrompts[k][i].Data)
 					if err != nil {
 						return err
 					}
-					d.prompts[k][i].Signature = sig
+					d.AllPrompts[k][i].Signature = sig
 				}
 			}
 		} else {
-			for i := range d.prompts[k] {
-				if d.prompts[k][i].Signature == "" {
+			for i := range d.AllPrompts[k] {
+				if d.AllPrompts[k][i].Signature == "" {
 					return ErrUnsigned
 				}
 			}
 		}
 	}
-	for k := range d.texts {
+	for k := range d.AllTexts {
 		if k == "gemini" {
-			for i := range d.texts[k] {
-				if d.texts[k][i].Signature == "" {
-					sig, err := sv.Sign(d.texts[k][i].Data)
+			for i := range d.AllTexts[k] {
+				if d.AllTexts[k][i].Signature == "" {
+					sig, err := sv.Sign(d.AllTexts[k][i].Data)
 					if err != nil {
 						return err
 					}
-					d.texts[k][i].Signature = sig
+					d.AllTexts[k][i].Signature = sig
 				}
 			}
 		} else {
-			for i := range d.texts[k] {
-				if d.texts[k][i].Signature == "" {
+			for i := range d.AllTexts[k] {
+				if d.AllTexts[k][i].Signature == "" {
 					return ErrUnsigned
 				}
 			}
@@ -104,13 +104,13 @@ func (d *GeminiDecision) Sign(sv brain.SignVerifier) error {
 }
 
 func (d *GeminiDecision) Verify(sv brain.SignVerifier) error {
-	for k := range d.cots {
-		for i := range d.cots[k] {
-			for j := range d.cots[k][i] {
-				if d.cots[k][i][j].Signature == "" {
+	for k := range d.ChainOfThoughts {
+		for i := range d.ChainOfThoughts[k] {
+			for j := range d.ChainOfThoughts[k][i] {
+				if d.ChainOfThoughts[k][i][j].Signature == "" {
 					return ErrUnsigned
 				} else {
-					err := sv.Verify(d.cots[k][i][j].Data, d.cots[k][i][j].Signature)
+					err := sv.Verify(d.ChainOfThoughts[k][i][j].Data, d.ChainOfThoughts[k][i][j].Signature)
 					if err != nil {
 						return err
 					}
@@ -118,24 +118,24 @@ func (d *GeminiDecision) Verify(sv brain.SignVerifier) error {
 			}
 		}
 	}
-	for k := range d.prompts {
-		for i := range d.prompts[k] {
-			if d.prompts[k][i].Signature == "" {
+	for k := range d.AllPrompts {
+		for i := range d.AllPrompts[k] {
+			if d.AllPrompts[k][i].Signature == "" {
 				return ErrUnsigned
 			} else {
-				err := sv.Verify(d.prompts[k][i].Data, d.prompts[k][i].Signature)
+				err := sv.Verify(d.AllPrompts[k][i].Data, d.AllPrompts[k][i].Signature)
 				if err != nil {
 					return err
 				}
 			}
 		}
 	}
-	for k := range d.texts {
-		for i := range d.texts[k] {
-			if d.texts[k][i].Signature == "" {
+	for k := range d.AllTexts {
+		for i := range d.AllTexts[k] {
+			if d.AllTexts[k][i].Signature == "" {
 				return ErrUnsigned
 			} else {
-				err := sv.Verify(d.texts[k][i].Data, d.texts[k][i].Signature)
+				err := sv.Verify(d.AllTexts[k][i].Data, d.AllTexts[k][i].Signature)
 				if err != nil {
 					return err
 				}
@@ -148,9 +148,9 @@ func (d *GeminiDecision) Verify(sv brain.SignVerifier) error {
 func (d *GeminiDecision) Cots() map[string][][]brain.Signed {
 	m := make(map[string][][]brain.Signed)
 	// deep copy
-	for k := range d.cots {
-		for i := range d.cots[k] {
-			m[k] = append(m[k], slices.Clone(d.cots[k][i]))
+	for k := range d.ChainOfThoughts {
+		for i := range d.ChainOfThoughts[k] {
+			m[k] = append(m[k], slices.Clone(d.ChainOfThoughts[k][i]))
 		}
 	}
 	return m
@@ -158,8 +158,8 @@ func (d *GeminiDecision) Cots() map[string][][]brain.Signed {
 
 func (d *GeminiDecision) Prompts() map[string][]brain.Signed {
 	m := make(map[string][]brain.Signed)
-	for k := range d.prompts {
-		m[k] = slices.Clone(d.prompts[k])
+	for k := range d.AllPrompts {
+		m[k] = slices.Clone(d.AllPrompts[k])
 	}
 
 	return m
@@ -167,16 +167,16 @@ func (d *GeminiDecision) Prompts() map[string][]brain.Signed {
 
 func (d *GeminiDecision) Texts() map[string][]brain.Signed {
 	m := make(map[string][]brain.Signed)
-	for k := range d.texts {
-		m[k] = slices.Clone(d.texts[k])
+	for k := range d.AllTexts {
+		m[k] = slices.Clone(d.AllTexts[k])
 	}
 
 	return m
 }
 
 func (d *GeminiDecision) Add(cot []brain.Signed, text brain.Signed, sv brain.SignVerifier) error {
-	d.cots["gemini"] = append(d.cots["gemini"], cot)
-	d.texts["gemini"] = append(d.texts["gemini"], text)
+	d.ChainOfThoughts["gemini"] = append(d.ChainOfThoughts["gemini"], cot)
+	d.AllTexts["gemini"] = append(d.AllTexts["gemini"], text)
 	err := d.Sign(sv) // sign all unsigned things
 	if err != nil {
 		return err
