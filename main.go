@@ -44,7 +44,7 @@ func main() {
 	}
 
 	sv := jwtwrapper.New(pub, priv)
-	gemini, err := gemini.New(os.Getenv("GEMINI_API_KEY"))
+	gemini, err := gemini.New(appContext, os.Getenv("GEMINI_API_KEY"), gemini.WithModel("gemini-pro-latest"))
 	if err != nil {
 		panic(err)
 	}
