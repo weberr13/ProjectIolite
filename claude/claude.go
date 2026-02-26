@@ -19,11 +19,11 @@ func New(opts ...Option) (*Claude, error) {
 }
 
 // Think generates the initial response
-func (g *Claude) Think(ctx context.Context, input brain.Request) (brain.Response, error) {
+func (g *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.Request) (brain.Response, error) {
 	return nil, brain.ErrNotImplemented
 }
 
 // Evaluate audits another brain's output
-func (g *Claude) Evaluate(ctx context.Context, peerOutput brain.Response) (brain.Decision, error) {
+func (g *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, prev brain.Decision) (brain.Decision, error) {
 	return nil, brain.ErrNotImplemented
 }
