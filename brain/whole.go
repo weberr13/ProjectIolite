@@ -47,6 +47,7 @@ type Response interface {
 	Describe(SignVerifier) string
 	Sign(SignVerifier) error
 	Verify(SignVerifier) error
+	Source() string
 }
 
 type Decision interface {
@@ -55,7 +56,8 @@ type Decision interface {
 	Texts() map[string][]Signed   // map of model -> turn responses
 	Sign(SignVerifier) error
 	Verify(SignVerifier) error
-	Add(cot []Signed, text Signed, sv SignVerifier) error
+	Add(source string, cot []Signed, text Signed, sv SignVerifier) error
+	Error() error
 }
 
 type Whole struct {
@@ -143,6 +145,14 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 		}
 		return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
 	}
+	// TODO: we need to check if the response is accepted/loop/etc
+	resp, err := b.right.Think(ctx, b.signVerifier, Request{t: prompt})
+	if err != nil {
+		log.Printf("tried to right think but failed: %s", err)
+		return &ErrorDecision{E: err}, err
+	}
+	return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
+
 	// TODO: when we have 2 halves we can implement the debate logic
 
 	// 	Will choose either right or left brain based on a criteria (random, text length, etc, TBD) and send the prompt
@@ -159,10 +169,6 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 
 	// in case 3 there will be a program counter for how many "back and forth" exchanges are permitted before the
 	// last result "wins" (a small number)
-	log.Printf("tried to dual think but we failed")
-	return &ErrorDecision{
-		E: ErrNotImplemented,
-	}, ErrNotImplemented
 }
 
 func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {

@@ -15,7 +15,10 @@ import (
 	"time"
 
 	"github.com/weberr13/ProjectIolite/brain"
+	"github.com/weberr13/ProjectIolite/claude"
 	"github.com/weberr13/ProjectIolite/gemini"
+
+	// "github.com/weberr13/ProjectIolite/gemini"
 	"github.com/weberr13/ProjectIolite/jwtwrapper"
 
 	"github.com/go-chi/chi/v5"
@@ -47,6 +50,10 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 					return
 				}
 				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
+			}
+			if decision.Error() != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
@@ -84,16 +91,16 @@ func main() {
 	}
 
 	sv := jwtwrapper.New(pub, priv)
-	// gemini.WithModel("gemini-pro-latest") this is expensive for testing, fallback to fast
-	gemini, err := gemini.New(appContext, os.Getenv("GEMINI_API_KEY"))
+	// gemini.WithModel("gemini-pro-latest")
+	ge, err := gemini.New(appContext, os.Getenv("GEMINI_API_KEY"))
 	if err != nil {
 		panic(err)
 	}
-	// claude, err := claude.New()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(gemini), brain.WithLeftBrain(nil))
+	cl, err := claude.New(os.Getenv("ANTHROPIC_API_KEY"))
+	if err != nil {
+		panic(err)
+	}
+	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(ge), brain.WithLeftBrain(cl))
 	if err != nil {
 		panic(err)
 	}

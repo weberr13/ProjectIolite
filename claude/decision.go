@@ -1,23 +1,25 @@
-package gemini
+package claude
 
 import (
+	"log"
 	"slices"
 
 	"github.com/weberr13/ProjectIolite/brain"
 )
 
-type GeminiDecision struct {
+type ClaudeDecision struct {
 	ChainOfThoughts map[string][][]brain.Signed
 	AllPrompts      map[string][]brain.Signed
 	AllTexts        map[string][]brain.Signed
 }
 
-func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, error) {
+func NewDecision(init brain.Response, sv brain.SignVerifier) (*ClaudeDecision, error) {
 	err := init.Verify(sv)
 	if err != nil {
+		log.Printf("failed to verify response: %s", err)
 		return nil, err // response is corrupted/edited
 	}
-	d := &GeminiDecision{
+	d := &ClaudeDecision{
 		ChainOfThoughts: map[string][][]brain.Signed{
 			init.Source(): {
 				init.CoT(),
@@ -38,13 +40,13 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, e
 	return d, err
 }
 
-func (e *GeminiDecision) Error() error {
+func (e *ClaudeDecision) Error() error {
 	return nil
 }
 
-func (d *GeminiDecision) Sign(sv brain.SignVerifier) error {
+func (d *ClaudeDecision) Sign(sv brain.SignVerifier) error {
 	for k := range d.ChainOfThoughts {
-		if k == "gemini" {
+		if k == "claude" {
 			for i := range d.ChainOfThoughts[k] {
 				for j := range d.ChainOfThoughts[k][i] {
 					if d.ChainOfThoughts[k][i][j].Signature == "" {
@@ -66,7 +68,7 @@ func (d *GeminiDecision) Sign(sv brain.SignVerifier) error {
 		}
 	}
 	for k := range d.AllPrompts {
-		if k == "gemini" {
+		if k == "claude" {
 			for i := range d.AllPrompts[k] {
 				if d.AllPrompts[k][i].Signature == "" {
 					err := d.AllPrompts[k][i].Sign(sv)
@@ -84,7 +86,7 @@ func (d *GeminiDecision) Sign(sv brain.SignVerifier) error {
 		}
 	}
 	for k := range d.AllTexts {
-		if k == "gemini" {
+		if k == "claude" {
 			for i := range d.AllTexts[k] {
 				if d.AllTexts[k][i].Signature == "" {
 					err := d.AllTexts[k][i].Sign(sv)
@@ -104,7 +106,7 @@ func (d *GeminiDecision) Sign(sv brain.SignVerifier) error {
 	return nil
 }
 
-func (d *GeminiDecision) Verify(sv brain.SignVerifier) error {
+func (d *ClaudeDecision) Verify(sv brain.SignVerifier) error {
 	for k := range d.ChainOfThoughts {
 		for i := range d.ChainOfThoughts[k] {
 			for j := range d.ChainOfThoughts[k][i] {
@@ -146,7 +148,7 @@ func (d *GeminiDecision) Verify(sv brain.SignVerifier) error {
 	return nil
 }
 
-func (d *GeminiDecision) Cots() map[string][][]brain.Signed {
+func (d *ClaudeDecision) Cots() map[string][][]brain.Signed {
 	m := make(map[string][][]brain.Signed)
 	// deep copy
 	for k := range d.ChainOfThoughts {
@@ -157,7 +159,7 @@ func (d *GeminiDecision) Cots() map[string][][]brain.Signed {
 	return m
 }
 
-func (d *GeminiDecision) Prompts() map[string][]brain.Signed {
+func (d *ClaudeDecision) Prompts() map[string][]brain.Signed {
 	m := make(map[string][]brain.Signed)
 	for k := range d.AllPrompts {
 		m[k] = slices.Clone(d.AllPrompts[k])
@@ -166,7 +168,7 @@ func (d *GeminiDecision) Prompts() map[string][]brain.Signed {
 	return m
 }
 
-func (d *GeminiDecision) Texts() map[string][]brain.Signed {
+func (d *ClaudeDecision) Texts() map[string][]brain.Signed {
 	m := make(map[string][]brain.Signed)
 	for k := range d.AllTexts {
 		m[k] = slices.Clone(d.AllTexts[k])
@@ -175,15 +177,20 @@ func (d *GeminiDecision) Texts() map[string][]brain.Signed {
 	return m
 }
 
-func (d *GeminiDecision) Add(sourceID string, cot []brain.Signed, text brain.Signed, sv brain.SignVerifier) error {
+func (d *ClaudeDecision) Add(sourceId string, cot []brain.Signed, text brain.Signed, sv brain.SignVerifier) error {
+	if d.ChainOfThoughts[sourceId] == nil {
+		d.ChainOfThoughts[sourceId] = [][]brain.Signed{}
+		d.AllTexts[sourceId] = []brain.Signed{}
+	}
+
 	// TODO: each "unit" of the chain of thought, chain, should have a signature too!
-	d.ChainOfThoughts[sourceID] = append(d.ChainOfThoughts[sourceID], cot)
-	last := len(d.AllTexts[sourceID]) - 1
+	d.ChainOfThoughts[sourceId] = append(d.ChainOfThoughts[sourceId], cot)
+	last := len(d.AllTexts[sourceId]) - 1
 	if last >= 0 {
 		// Join the new text to the chain before signing
-		text.PrevSignature = d.AllTexts[sourceID][last].Signature
+		text.PrevSignature = d.AllTexts[sourceId][last].Signature
 	}
-	d.AllTexts[sourceID] = append(d.AllTexts[sourceID], text)
+	d.AllTexts[sourceId] = append(d.AllTexts[sourceId], text)
 	err := d.Sign(sv) // sign all unsigned things
 	if err != nil {
 		return err

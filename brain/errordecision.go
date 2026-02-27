@@ -16,6 +16,10 @@ func (ErrorDecision) Prompts() map[string][]Signed {
 	return nil
 }
 
+func (e *ErrorDecision) Error() error {
+	return e.E
+}
+
 func (e *ErrorDecision) Texts() map[string][]Signed {
 	return map[string][]Signed{
 		"system": {
@@ -32,7 +36,7 @@ func (ErrorDecision) Verify(SignVerifier) error {
 	return nil
 }
 
-func (e *ErrorDecision) Add(cot []Signed, text Signed, sv SignVerifier) error {
+func (e *ErrorDecision) Add(_ string, cot []Signed, text Signed, sv SignVerifier) error {
 	e.E = fmt.Errorf("%s: %w", text.Data, e.E)
 	return nil
 }

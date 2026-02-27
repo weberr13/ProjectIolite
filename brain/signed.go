@@ -1,6 +1,9 @@
 package brain
 
-import "errors"
+import (
+	"encoding/base64"
+	"errors"
+)
 
 var ErrUnsigned = errors.New("an attempt was made to verify an unsigned data block")
 
@@ -8,7 +11,7 @@ type Signed struct {
 	Namespace     string `json:"namespace"`
 	Data          string `json:"data"`
 	Signature     string `json:"signature"`
-	PrevSignature string `json:"prev_signature,omitempty"`
+	PrevSignature string `json:"prev_signature"`
 }
 
 func NewUnsigned(data, namespace string) Signed {
@@ -27,10 +30,11 @@ func (s *Signed) NextUnsigned(data string) Signed {
 }
 
 func (s *Signed) Sign(sv SignVerifier) error {
+	b64Data := base64.StdEncoding.EncodeToString([]byte(s.Data))
 	if s.Signature != "" { // never sign twice
-		return sv.Verify(s.Data+s.PrevSignature, s.Signature)
+		return sv.Verify(b64Data+s.PrevSignature, s.Signature)
 	}
-	sig, err := sv.Sign(s.Data + s.PrevSignature)
+	sig, err := sv.Sign(b64Data + s.PrevSignature)
 	if err != nil {
 		return err
 	}
@@ -42,5 +46,6 @@ func (s *Signed) Verify(sv SignVerifier) error {
 	if s.Signature == "" {
 		return ErrUnsigned
 	}
-	return sv.Verify(s.Data+s.PrevSignature, s.Signature)
+	b64Data := base64.StdEncoding.EncodeToString([]byte(s.Data))
+	return sv.Verify(b64Data+s.PrevSignature, s.Signature)
 }
