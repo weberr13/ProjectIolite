@@ -5,19 +5,22 @@ import "errors"
 var ErrUnsigned = errors.New("an attempt was made to verify an unsigned data block")
 
 type Signed struct {
+	Namespace     string `json:"namespace"`
 	Data          string `json:"data"`
 	Signature     string `json:"signature"`
 	PrevSignature string `json:"prev_signature,omitempty"`
 }
 
-func NewUnsigned(data string) Signed {
+func NewUnsigned(data, namespace string) Signed {
 	return Signed{
-		Data: data,
+		Namespace: namespace,
+		Data:      data,
 	}
 }
 
 func (s *Signed) NextUnsigned(data string) Signed {
 	return Signed{
+		Namespace:     s.Namespace,
 		Data:          data,
 		PrevSignature: s.Signature,
 	}

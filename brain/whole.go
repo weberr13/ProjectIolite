@@ -13,28 +13,6 @@ var (
 	ErrNoSignVerifier = errors.New("required sign and verify wrapper not found")
 	ErrNoLLMBrain     = errors.New("at least model must be connected")
 	ErrNotImplemented = errors.New("not implemented")
-
-	DecodePy = `import base64
-from cryptography.hazmat.primitives.asymmetric import ed25519
-
-def verify_iolite_signature(pub_key_base64, data, signature_base64):
-    # Decode the key and signature from the "Signed" struct
-    public_key_bytes = base64.b64decode(pub_key_base64)
-    signature_bytes = base64.b64decode(signature_base64)
-    
-    # Load the Ed25519 public key
-    public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
-    
-    try:
-        # Verify the data (the 'Handshake Request' or CoT string)
-        public_key.verify(signature_bytes, data.encode('utf-8'))
-        return True
-    except Exception:
-        return False
-
-# Example usage from a model's 'Evaluation' pass
-# pub_key = "..." from Go ExportPublicKey()
-# result = verify_iolite_signature(pub_key, "the thought string", "the_signature")`
 )
 
 type SignVerifier interface {
@@ -42,6 +20,7 @@ type SignVerifier interface {
 	Verify(data, signature string) error
 	ExportPublicKey() string
 	Alg() string
+	VerifyPy() string
 }
 
 type Thinker interface {
@@ -122,7 +101,7 @@ func WithHeartbeatTime(d time.Duration) Option {
 func NewWhole(opt ...Option) (*Whole, error) {
 	b := &Whole{
 		heartbeat:    5 * time.Second,
-		maxQueryTime: 60 * time.Second,
+		maxQueryTime: 600 * time.Second,
 		queries:      make(chan Query, 10), // optionally tune this depth later
 	}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"time"
 
 	"google.golang.org/genai"
 
@@ -49,6 +50,7 @@ func New(ctx context.Context, apikey string, opts ...Option) (*Gemini, error) {
 	for _, o := range opts {
 		o(g)
 	}
+
 	client, err := genai.NewClient(ctx, g.cfg)
 	if err != nil {
 		return nil, err
@@ -67,7 +69,11 @@ func (g *Gemini) genConfig() *genai.GenerateContentConfig {
 
 // Think generates the initial response
 func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.Request) (brain.Response, error) {
-	prompt := brain.NewUnsigned(input.Text())
+	now := time.Now()
+	defer func() {
+		log.Printf("Think took: %v", time.Since(now))
+	}()
+	prompt := brain.NewUnsigned(input.Text(), "prompt")
 	err := prompt.Sign(sv)
 	result, err := g.cl.Models.GenerateContent(ctx, g.model, genai.Text(input.Text()), g.genConfig())
 	if err != nil {
@@ -81,6 +87,10 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 
 // Evaluate audits another brain's output
 func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, prev brain.Decision) (brain.Decision, error) {
+	now := time.Now()
+	defer func() {
+		log.Printf("Evaluate took: %v", time.Since(now))
+	}()
 	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
 	if prev != nil {
 		s, _ := json.MarshalIndent(prev, " ", " ")
@@ -94,13 +104,29 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	// 	cfg.CandidateCount = 3
 	// } else {
 	cfg.CandidateCount = 1
+	instruction := genai.Text("You are an Iolite auditor. You will receive blocks labeled by their Namespace. " +
+		"Prompts are roots or link to previous Prompts. " +
+		"Thoughts (CoT) link to the previous Thought in your own internal ruminant chain. " +
+		"Responses link to the previous Response in the global result chain. " +
+		"A block is valid if its signature matches its data + its specific chain-predecessor. " +
+		"The structure of distinct namespaced chains is an intentional archetectural decision to create a cryptographic Directed Acyclic Graph (DAG). " +
+		"Script: " + sv.VerifyPy(),
+	)
 	// }
+	if len(instruction) == 1 {
+		cfg.SystemInstruction = instruction[0]
+		cfg.Tools = append(cfg.Tools, &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}})
+	} else {
+		log.Printf("could not generate single part system instruction, instead we got %#v", instruction)
+	}
+	s, _ := json.MarshalIndent(cfg, " ", " ")
+	log.Printf("using model instructions: %s", s)
 
 	result, err := g.cl.Models.GenerateContent(ctx, "gemini-pro-latest", genai.Text(peerOutput.Describe(sv)), cfg)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
-	s, _ := json.MarshalIndent(result, " ", " ")
+	s, _ = json.MarshalIndent(result, " ", " ")
 	log.Printf("got result: %s", s)
 	if prev == nil {
 		log.Printf("creating new decision struct")
@@ -109,7 +135,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			return nil, err
 		}
 	}
-	err = prev.Add(candidatesToThoughts(result), brain.NewUnsigned(result.Text()), sv)
+	err = prev.Add(candidatesToThoughts(result), brain.NewUnsigned(result.Text(), "text"), sv)
 	if err != nil {
 		return prev, err
 	}
