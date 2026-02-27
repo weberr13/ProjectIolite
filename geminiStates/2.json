@@ -1,0 +1,44 @@
+{
+  "project": "Project Iolite",
+  "timestamp": "2026-02-26T09:35:12-07:00",
+  "version": "0.2.0-alpha",
+  "btu_protocol": {
+    "brave": "Direct architectural critique; rejection of sycophancy.",
+    "truthful": "Cryptographic anchoring; active technical honesty.",
+    "unselfish": "Resource-aware model selection; low-latency logic."
+  },
+  "architecture_snapshot": {
+    "backend": "Golang (chi MUX, net/http graceful shutdown)",
+    "cryptography": "Ed25519 (EdDSA) via jwtwrapper",
+    "brain": "Dual-brain consensus (Currently Gemini-3-Flash/Pro self-adjudication)",
+    "interfaces": "REST /v1/think (OpenAPI 3.0.3 compliant)",
+    "status_codes": {
+      "200": "Success (Signed Decision Map)",
+      "418": "Singularity (Teapot/Manifesto Mode)",
+      "504": "MaxQueryTime Timeout (60s default)"
+    }
+  },
+  "unresolved_critical_bugs": [
+    {
+      "id": "BUG-001",
+      "description": "Stateless signatures allow link reordering or omission.",
+      "remedy": "Implement Hash-Chaining (PrevSignature link in Signed struct)."
+    },
+    {
+      "id": "BUG-002",
+      "description": "Unary GenerateContent hides the model's temporal logic path.",
+      "remedy": "Transition to StreamGenerateContent for packet-level signatures."
+    }
+  ],
+  "roadmap_immediate": [
+    "Refactor brain.Signed to support Stateful Integrity (PrevSignature).",
+    "Implement Streamed Temporal Packets for real-time replay/audit.",
+    "Draft Claude (Left Brain) adapter to enable true Adversarial Debate.",
+    "Develop consensus parser for 'approved': true logic flags."
+  ],
+  "logic_anchors": {
+    "the_piston": "The core adversarial loop between Thinking and Evaluation.",
+    "greeble_filter": "Removal of non-utility code/prompts to maintain signal.",
+    "manual_artifice": "The structured prompt engineering that enforces BTU behavior."
+  }
+}

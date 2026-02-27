@@ -19,7 +19,7 @@ func (ErrorDecision) Prompts() map[string][]Signed {
 func (e *ErrorDecision) Texts() map[string][]Signed {
 	return map[string][]Signed{
 		"system": {
-			{Data: fmt.Sprintf("CRITICAL_FAILURE: %v", e.E)}, // Force string conversion
+			NewUnsigned(fmt.Sprintf("CRITICAL_FAILURE: %v", e.E)),
 		},
 	}
 }

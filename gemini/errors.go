@@ -23,7 +23,7 @@ func (e *GeminiError) Sign(sv brain.SignVerifier) error {
 
 func (e *GeminiError) CoT() []brain.Signed {
 	return []brain.Signed{
-		{Data: e.e.Error()},
+		brain.NewUnsigned(e.e.Error()),
 	}
 }
 
@@ -35,7 +35,8 @@ func (e *GeminiError) Verify(sv brain.SignVerifier) error {
 }
 
 func (e *GeminiError) Text() *brain.Signed {
-	return &brain.Signed{Data: e.e.Error()}
+	s := brain.NewUnsigned(e.e.Error())
+	return &s
 }
 
 func (e *GeminiError) Describe(sv brain.SignVerifier) string {
@@ -49,5 +50,5 @@ func (e *GeminiError) Describe(sv brain.SignVerifier) string {
 }
 
 func (e *GeminiError) Prompt() brain.Signed {
-	return brain.Signed{Data: e.input}
+	return brain.NewUnsigned(e.input)
 }

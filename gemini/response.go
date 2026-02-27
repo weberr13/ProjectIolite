@@ -25,9 +25,12 @@ func candidatesToThoughts(resp *genai.GenerateContentResponse) []brain.Signed {
 	for _, c := range resp.Candidates {
 		for _, p := range c.Content.Parts {
 			if p.Thought {
-				thoughts = append(thoughts, brain.Signed{
-					Data: p.Text,
-				})
+				last := len(thoughts) - 1
+				if last < 0 {
+					thoughts = append(thoughts, brain.NewUnsigned(p.Text))
+				} else {
+					thoughts = append(thoughts, thoughts[last].NextUnsigned(p.Text))
+				}
 			}
 		}
 	}
@@ -43,7 +46,8 @@ func (r *GeminiResponse) CoT() []brain.Signed {
 
 func (r *GeminiResponse) Text() *brain.Signed {
 	if r.thought == nil {
-		r.thought = &brain.Signed{Data: r.resp.Text()}
+		s := brain.NewUnsigned(r.resp.Text())
+		r.thought = &s
 	}
 	return r.thought
 }
@@ -56,35 +60,34 @@ func (r *GeminiResponse) Sign(sv brain.SignVerifier) error {
 		_ = r.Text()
 	}
 	if r.prompt.Signature == "" {
-		sig, err := sv.Sign(r.prompt.Data)
+		err := r.prompt.Sign(sv)
 		if err != nil {
 			return err
 		}
-		r.prompt.Signature = sig
 	}
 	var err error
 	for i := range r.cot {
-		r.cot[i].Signature, err = sv.Sign(r.cot[i].Data)
+		err = r.cot[i].Sign(sv)
 		if err != nil {
 			return err
 		}
 	}
-	r.thought.Signature, err = sv.Sign(r.thought.Data)
+	err = r.thought.Sign(sv)
 	return err
 }
 
 func (r *GeminiResponse) Verify(sv brain.SignVerifier) error {
 	if r.cot == nil || r.thought == nil {
-		return ErrUnsigned
+		return brain.ErrUnsigned
 	}
 	var err error
 	for i := range r.cot {
-		err = sv.Verify(r.cot[i].Data, r.cot[i].Signature)
+		err = r.cot[i].Verify(sv)
 		if err != nil {
 			return err
 		}
 	}
-	return sv.Verify(r.thought.Data, r.thought.Signature)
+	return r.thought.Verify(sv)
 }
 
 func (r *GeminiResponse) Describe(sv brain.SignVerifier) string {
