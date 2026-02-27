@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 
 	"github.com/golang-jwt/jwt"
+	"golang.org/x/text/unicode/norm"
 )
 
 //go:embed edDSA.py
@@ -37,7 +38,8 @@ func (s *SignVerifier) VerifyPy() string {
 }
 
 func (s *SignVerifier) Sign(data string) (string, error) {
-	return s.method.Sign(data, s.privateKey)
+	canonicalData := norm.NFC.String(data)
+	return s.method.Sign(canonicalData, s.privateKey)
 }
 
 func (s SignVerifier) Verify(data, signature string) error {

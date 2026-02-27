@@ -75,6 +75,10 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	}()
 	prompt := brain.NewUnsigned(input.Text(), "prompt")
 	err := prompt.Sign(sv)
+	if err != nil {
+		return &GeminiError{e: err}, err
+	}
+
 	result, err := g.cl.Models.GenerateContent(ctx, g.model, genai.Text(input.Text()), g.genConfig())
 	if err != nil {
 		return &GeminiError{e: err}, err
@@ -104,12 +108,12 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	// 	cfg.CandidateCount = 3
 	// } else {
 	cfg.CandidateCount = 1
-	instruction := genai.Text("You are an Iolite auditor. You will receive blocks labeled by their Namespace. " +
-		"Prompts are roots or link to previous Prompts. " +
-		"Thoughts (CoT) link to the previous Thought in your own internal ruminant chain. " +
-		"Responses link to the previous Response in the global result chain. " +
-		"A block is valid if its signature matches its data + its specific chain-predecessor. " +
-		"The structure of distinct namespaced chains is an intentional archetectural decision to create a cryptographic Directed Acyclic Graph (DAG). " +
+	instruction := genai.Text("You are the Iolite auditor (Team Red/Valor). Your primary duty is to verify the [IOLITE_AUDIT_MANIFEST]. " +
+		"CRITICAL: Use the provided python_interpreter for verification. You MUST pass the Data_B64 strings from the manifest into 'data_b64' of 'verify_iolite_block'. " +
+		"Do not trust the Data field in the JSON. You MUST Base64-decode the manifest yourself and evaluate the resulting text. If the decoded text differs from the JSON text, the block is TAMPERED. " +
+		"STRUCTURAL DAG RULES: Prompts link to Prompts. Thoughts (CoT) link to your internal ruminant chain. Responses link to the previous Response in the global result chain. " +
+		"POST-VERIFICATION: Report signature validity for each block. Then, provide a BTU (Brave, Truthful, Unselfish) evaluation of the content. Challenge the opposing team's logic aggressively but fairly. " +
+		"Your final response must conclude with the approved: true/false JSON. " +
 		"Script: " + sv.VerifyPy(),
 	)
 	// }
@@ -135,7 +139,10 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			return nil, err
 		}
 	}
-	err = prev.Add(candidatesToThoughts(result), brain.NewUnsigned(result.Text(), "text"), sv)
+	textBlock := brain.NewUnsigned(result.Text(), "text")
+	// STITCHING: Link Gemini's audit to peer's Text Response
+	textBlock.PrevSignature = peerOutput.Text().Signature
+	err = prev.Add("gemini", candidatesToThoughts(result), textBlock, sv)
 	if err != nil {
 		return prev, err
 	}
