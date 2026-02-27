@@ -59,11 +59,6 @@ func (r *Request) Text() string {
 	return r.t
 }
 
-type Signed struct {
-	Data      string
-	Signature string
-}
-
 type Response interface {
 	CoT() []Signed
 	Text() *Signed

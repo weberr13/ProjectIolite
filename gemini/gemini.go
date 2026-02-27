@@ -13,7 +13,6 @@ import (
 
 var (
 	ErrNoKeyFound = errors.New("provide a gemini API key on GEMINI_API_KEY")
-	ErrUnsigned   = errors.New("response has not been parsed and signed")
 	HighTemp      = float32(1.2)
 	NarrowTopP    = float32(.8)
 )
@@ -68,14 +67,8 @@ func (g *Gemini) genConfig() *genai.GenerateContentConfig {
 
 // Think generates the initial response
 func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.Request) (brain.Response, error) {
-	pSig, err := sv.Sign(input.Text())
-	if err != nil {
-		return nil, err
-	}
-	prompt := brain.Signed{
-		Data:      input.Text(),
-		Signature: pSig,
-	}
+	prompt := brain.NewUnsigned(input.Text())
+	err := prompt.Sign(sv)
 	result, err := g.cl.Models.GenerateContent(ctx, g.model, genai.Text(input.Text()), g.genConfig())
 	if err != nil {
 		return &GeminiError{e: err}, err
@@ -116,7 +109,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			return nil, err
 		}
 	}
-	err = prev.Add(candidatesToThoughts(result), brain.Signed{Data: result.Text()}, sv)
+	err = prev.Add(candidatesToThoughts(result), brain.NewUnsigned(result.Text()), sv)
 	if err != nil {
 		return prev, err
 	}
