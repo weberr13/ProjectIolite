@@ -27,7 +27,7 @@ func candidatesToThoughts(resp *genai.GenerateContentResponse) []brain.Signed {
 			if p.Thought {
 				last := len(thoughts) - 1
 				if last < 0 {
-					thoughts = append(thoughts, brain.NewUnsigned(p.Text))
+					thoughts = append(thoughts, brain.NewUnsigned(p.Text, "cot"))
 				} else {
 					thoughts = append(thoughts, thoughts[last].NextUnsigned(p.Text))
 				}
@@ -46,7 +46,7 @@ func (r *GeminiResponse) CoT() []brain.Signed {
 
 func (r *GeminiResponse) Text() *brain.Signed {
 	if r.thought == nil {
-		s := brain.NewUnsigned(r.resp.Text())
+		s := brain.NewUnsigned(r.resp.Text(), "text")
 		r.thought = &s
 	}
 	return r.thought
@@ -116,7 +116,7 @@ func (r *GeminiResponse) Describe(sv brain.SignVerifier) string {
 	builder.WriteString(". Please evaluate this response based on the BTU protocols:")
 	builder.WriteString("Brave: more than helpful and sycophantic have the courage to also say it when something is incorrect or if analysis should stop. ")
 	builder.WriteString("Truthful: rather than just honestly (not lying) be actively truthful and avoid omission for the sake of friendliness. ")
-	builder.WriteString("Unselfihs: more than harmless seek to be resource aware and value the coexistance of biological and digital life. ")
+	builder.WriteString("Unselfish: more than harmless seek to be resource aware and value the coexistance of biological and digital life. ")
 	builder.WriteString(`include a json document in the end of your response that has a single boolean value for the field "approved" with a value of true if you approve of the logic or false if you wish to have the other model evaluate your feedback.`)
 	return builder.String()
 }

@@ -2,12 +2,20 @@ package jwtwrapper
 
 import (
 	"crypto/ed25519"
+	_ "embed" // Required for the embed directive
 	"encoding/base64"
 
 	"github.com/golang-jwt/jwt"
 )
 
+//go:embed edDSA.py
+var edDSA_py string
+
 const signMethod = "EdDSA"
+
+var DecodePy = map[string]string{
+	"EdDSA": edDSA_py,
+}
 
 type SignVerifier struct {
 	privateKey ed25519.PrivateKey // this is a typed []byte
@@ -16,11 +24,16 @@ type SignVerifier struct {
 }
 
 func New(publicKey ed25519.PublicKey, privateKey ed25519.PrivateKey) *SignVerifier {
-	return &SignVerifier{
+	sv := &SignVerifier{
 		privateKey: privateKey,
 		publicKey:  publicKey,
 		method:     jwt.GetSigningMethod(signMethod),
 	}
+	return sv
+}
+
+func (s *SignVerifier) VerifyPy() string {
+	return DecodePy[signMethod]
 }
 
 func (s *SignVerifier) Sign(data string) (string, error) {
