@@ -241,7 +241,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		prev, err = NewDecision(peerOutput, sv)
 		if err != nil {
 			log.Printf("error creating decision struct")
-			return nil, err
+			return &brain.ErrorDecision{E: err}, err
 		}
 	}
 	textBlock := brain.NewUnsigned(extractText(message), "text")

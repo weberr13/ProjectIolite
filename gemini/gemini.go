@@ -18,11 +18,16 @@ var (
 	NarrowTopP    = float32(.8)
 )
 
+type ContentGenerator interface {
+	GenerateContent(context.Context, string, []*genai.Content, *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error)
+}
+
 type Gemini struct {
-	key   string
-	cl    *genai.Client
-	cfg   *genai.ClientConfig
-	model string
+	key       string
+	cl        *genai.Client
+	model     string
+	cfg       *genai.ClientConfig
+	generator ContentGenerator
 }
 
 type Option func(b *Gemini)
@@ -56,6 +61,7 @@ func New(ctx context.Context, apikey string, opts ...Option) (*Gemini, error) {
 		return nil, err
 	}
 	g.cl = client
+	g.generator = g.cl.Models
 	return g, nil
 }
 
@@ -73,13 +79,16 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	defer func() {
 		log.Printf("Think took: %v", time.Since(now))
 	}()
+	if g.cl == nil || g.generator == nil {
+		return &brain.ErrorResponse{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
+	}
 	prompt := brain.NewUnsigned(input.Text(), "prompt")
 	err := prompt.Sign(sv)
 	if err != nil {
 		return &GeminiError{e: err}, err
 	}
 
-	result, err := g.cl.Models.GenerateContent(ctx, g.model, genai.Text(input.Text()), g.genConfig())
+	result, err := g.generator.GenerateContent(ctx, g.model, genai.Text(input.Text()), g.genConfig())
 	if err != nil {
 		return &GeminiError{e: err}, err
 	}
@@ -95,6 +104,9 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	defer func() {
 		log.Printf("Evaluate took: %v", time.Since(now))
 	}()
+	if g.cl == nil || g.generator == nil {
+		return &brain.ErrorDecision{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
+	}
 	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
 	if prev != nil {
 		s, _ := json.MarshalIndent(prev, " ", " ")
@@ -126,7 +138,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	s, _ := json.MarshalIndent(cfg, " ", " ")
 	log.Printf("using model instructions: %s", s)
 
-	result, err := g.cl.Models.GenerateContent(ctx, "gemini-pro-latest", genai.Text(peerOutput.Describe(sv)), cfg)
+	result, err := g.generator.GenerateContent(ctx, "gemini-pro-latest", genai.Text(peerOutput.Describe(sv)), cfg)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
@@ -136,7 +148,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		log.Printf("creating new decision struct")
 		prev, err = NewDecision(peerOutput, sv)
 		if err != nil {
-			return nil, err
+			return &brain.ErrorDecision{E: err}, err
 		}
 	}
 	textBlock := brain.NewUnsigned(result.Text(), "text")

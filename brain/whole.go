@@ -31,11 +31,11 @@ type Thinker interface {
 }
 
 type Request struct {
-	t string
+	T string
 }
 
 func (r *Request) Text() string {
-	return r.t
+	return r.T
 }
 
 type Response interface {
@@ -131,14 +131,14 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 		log.Printf("tried to think but no brains detected")
 		return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
 	case b.left == nil:
-		resp, err := b.right.Think(ctx, b.signVerifier, Request{t: prompt})
+		resp, err := b.right.Think(ctx, b.signVerifier, Request{T: prompt})
 		if err != nil {
 			log.Printf("tried to right think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
 		}
 		return b.right.Evaluate(ctx, b.signVerifier, resp, nil)
 	case b.right == nil:
-		resp, err := b.left.Think(ctx, b.signVerifier, Request{t: prompt})
+		resp, err := b.left.Think(ctx, b.signVerifier, Request{T: prompt})
 		if err != nil {
 			log.Printf("tried to left think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
@@ -146,7 +146,7 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 		return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
 	}
 	// TODO: we need to check if the response is accepted/loop/etc
-	resp, err := b.right.Think(ctx, b.signVerifier, Request{t: prompt})
+	resp, err := b.right.Think(ctx, b.signVerifier, Request{T: prompt})
 	if err != nil {
 		log.Printf("tried to right think but failed: %s", err)
 		return &ErrorDecision{E: err}, err
