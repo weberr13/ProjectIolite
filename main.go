@@ -53,7 +53,7 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 				return
 			}
 			if decision.Error() != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(w, decision.Error().Error(), http.StatusInternalServerError)
 				return
 			}
 

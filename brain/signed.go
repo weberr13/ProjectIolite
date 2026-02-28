@@ -7,6 +7,11 @@ import (
 
 var ErrUnsigned = errors.New("an attempt was made to verify an unsigned data block")
 
+type CanSignOrVerify interface {
+	Sign(data string) (string, error)
+	Verify(data, signature string) error
+}
+
 type Signed struct {
 	Namespace     string `json:"namespace"`
 	Data          string `json:"data"`
@@ -29,7 +34,7 @@ func (s *Signed) NextUnsigned(data string) Signed {
 	}
 }
 
-func (s *Signed) Sign(sv SignVerifier) error {
+func (s *Signed) Sign(sv CanSignOrVerify) error {
 	b64Data := base64.StdEncoding.EncodeToString([]byte(s.Data))
 	if s.Signature != "" { // never sign twice
 		return sv.Verify(b64Data+s.PrevSignature, s.Signature)
@@ -42,7 +47,7 @@ func (s *Signed) Sign(sv SignVerifier) error {
 	return nil
 }
 
-func (s *Signed) Verify(sv SignVerifier) error {
+func (s *Signed) Verify(sv CanSignOrVerify) error {
 	if s.Signature == "" {
 		return ErrUnsigned
 	}

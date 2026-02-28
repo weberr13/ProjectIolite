@@ -17,6 +17,7 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, e
 	if err != nil {
 		return nil, err // response is corrupted/edited
 	}
+	text := init.Text()
 	d := &GeminiDecision{
 		ChainOfThoughts: map[string][][]brain.Signed{
 			init.Source(): {
@@ -30,7 +31,7 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, e
 		},
 		AllTexts: map[string][]brain.Signed{
 			init.Source(): {
-				*init.Text(),
+				*text,
 			},
 		},
 	}

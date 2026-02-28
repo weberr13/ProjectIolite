@@ -4,6 +4,38 @@ import (
 	"fmt"
 )
 
+type ErrorResponse struct {
+	E error
+}
+
+func (ErrorResponse) CoT() []Signed {
+	return nil
+}
+
+func (e *ErrorResponse) Text() *Signed {
+	return &Signed{Data: e.E.Error()}
+}
+
+func (e *ErrorResponse) Prompt() Signed {
+	return Signed{Data: e.E.Error()}
+}
+
+func (e *ErrorResponse) Describe(SignVerifier) string {
+	return e.E.Error()
+}
+
+func (e *ErrorResponse) Sign(SignVerifier) error {
+	return e.E
+}
+
+func (e *ErrorResponse) Verify(SignVerifier) error {
+	return e.E
+}
+
+func (e *ErrorResponse) Source() string {
+	return e.E.Error()
+}
+
 type ErrorDecision struct {
 	E error
 }
