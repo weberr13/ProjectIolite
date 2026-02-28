@@ -48,6 +48,7 @@ type Response interface {
 	Sign(SignVerifier) error
 	Verify(SignVerifier) error
 	Source() string
+	IsError() error
 }
 
 type Decision interface {
@@ -136,12 +137,24 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 			log.Printf("tried to right think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
 		}
+		if resp == nil {
+			return &ErrorDecision{E: ErrNoLLMBrain}, err
+		}
+		if resp.IsError() != nil {
+			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
+		}
 		return b.right.Evaluate(ctx, b.signVerifier, resp, nil)
 	case b.right == nil:
 		resp, err := b.left.Think(ctx, b.signVerifier, Request{T: prompt})
 		if err != nil {
 			log.Printf("tried to left think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
+		}
+		if resp == nil {
+			return &ErrorDecision{E: ErrNoLLMBrain}, err
+		}
+		if resp.IsError() != nil {
+			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 		}
 		return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
 	}
@@ -150,6 +163,12 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 	if err != nil {
 		log.Printf("tried to right think but failed: %s", err)
 		return &ErrorDecision{E: err}, err
+	}
+	if resp == nil {
+		return &ErrorDecision{E: ErrNoLLMBrain}, err
+	}
+	if resp.IsError() != nil {
+		return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 	}
 	return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
 
@@ -172,9 +191,7 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 }
 
 func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for {
 			select {
 			case <-appCtx.Done():
@@ -203,7 +220,7 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 				}(appCtx, q)
 			}
 		}
-	}()
+	})
 }
 
 // Push sends a query to the brain and waits for the decision.
@@ -218,6 +235,9 @@ func (b *Whole) Push(ctx context.Context, input string) (Decision, error) {
 
 	select {
 	case d := <-c:
+		if d.IsError() != nil {
+			return d, d.IsError()
+		}
 		return d, d.Verify(b.signVerifier)
 	case <-ctx.Done():
 		return nil, ctx.Err()

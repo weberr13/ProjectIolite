@@ -66,3 +66,7 @@ func (e *ClaudeError) Unwrap() error {
 	// The "Magic Key" that allows callers to see the root cause
 	return e.e
 }
+
+func (e *ClaudeError) IsError() error {
+	return e.e
+}

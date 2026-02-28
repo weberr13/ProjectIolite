@@ -68,3 +68,7 @@ func (e *GeminiError) Error() string {
 func (e *GeminiError) Unwrap() error {
 	return e.e
 }
+
+func (e *GeminiError) IsError() error {
+	return e.e
+}

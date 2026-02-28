@@ -39,7 +39,9 @@ func TestWhole_Orchestration(t *testing.T) {
 		prompt := "Why did the pen stay still?"
 
 		resp := new(MockResponse)
+		resp.On("IsError").Return(nil).Maybe()
 		dec := new(MockDecision)
+		dec.On("IsError").Return(nil).Maybe()
 
 		// Setup: Left Think -> Left Evaluate
 		mockLeft.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
@@ -58,7 +60,9 @@ func TestWhole_Orchestration(t *testing.T) {
 		prompt := "Verify the braid integrity."
 
 		resp := new(MockResponse)
+		resp.On("IsError").Return(nil).Maybe()
 		dec := new(MockDecision)
+		dec.On("IsError").Return(nil).Maybe()
 
 		// Current Logic: Right always thinks first, Left evaluates
 		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
@@ -81,7 +85,9 @@ func TestWhole_Orchestration(t *testing.T) {
 
 		// Setup Mocks
 		resp := new(MockResponse)
+		resp.On("IsError").Return(nil).Maybe()
 		dec := new(MockDecision)
+		dec.On("IsError").Return(nil).Maybe()
 		dec.On("Verify", mockSV).Return(nil)
 
 		mockLeft.On("Think", mock.Anything, mockSV, mock.Anything).Return(resp, nil)
@@ -132,17 +138,19 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 			left:         nil,
 		}
 
-		mockResp := new(MockResponse)
-		mockDec := new(MockDecision)
+		resp := new(MockResponse)
+		resp.On("IsError").Return(nil).Maybe()
+		dec := new(MockDecision)
+		dec.On("IsError").Return(nil).Maybe()
 
 		// Expectations: Think then immediately Evaluate
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(mockResp, nil).Once()
-		mockRight.On("Evaluate", ctx, mockSV, mockResp, mock.Anything).Return(mockDec, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockRight.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
 
 		result, err := b.Think(ctx, prompt)
 
 		assert.NoError(t, err)
-		assert.Equal(t, mockDec, result)
+		assert.Equal(t, dec, result)
 		mockRight.AssertExpectations(t)
 	})
 
@@ -224,19 +232,21 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 			right:        mockRight,
 		}
 
-		mockResp := new(MockResponse)
-		mockDec := new(MockDecision)
+		resp := new(MockResponse)
+		resp.On("IsError").Return(nil).Maybe()
+		dec := new(MockDecision)
+		dec.On("IsError").Return(nil).Maybe()
 
 		// Verification of the "Braid": Right generates, Left audits
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(mockResp, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
 
 		// Ensure mockResp from Right is the exact object passed to Left.Evaluate
-		mockLeft.On("Evaluate", ctx, mockSV, mockResp, (Decision)(nil)).Return(mockDec, nil).Once()
+		mockLeft.On("Evaluate", ctx, mockSV, resp, (Decision)(nil)).Return(dec, nil).Once()
 
 		result, err := b.Think(ctx, prompt)
 
 		assert.NoError(t, err)
-		assert.Equal(t, mockDec, result)
+		assert.Equal(t, dec, result)
 		mockRight.AssertExpectations(t)
 		mockLeft.AssertExpectations(t)
 	})
@@ -252,6 +262,7 @@ func TestWhole_Think_ContextSanity_Fixed(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		prompt := "Context Check"
 		resp := new(MockResponse)
+		resp.On("IsError").Return(nil).Maybe()
 
 		// Step 1: Right Brain succeeds but cancels context
 		mockRight.On("Think", mock.Anything, mockSV, mock.Anything).Return(resp, nil).Run(func(args mock.Arguments) {
@@ -274,5 +285,115 @@ func TestWhole_Think_ContextSanity_Fixed(t *testing.T) {
 
 		mockRight.AssertExpectations(t)
 		mockLeft.AssertExpectations(t)
+	})
+}
+
+func TestBrain_ErrorBranches(t *testing.T) {
+	// Setup for Heartbeat Test
+	fastHeartbeat := 10 * time.Millisecond
+	b := &Whole{
+		queries:      make(chan Query),
+		heartbeat:    fastHeartbeat,
+		maxQueryTime: 50 * time.Millisecond,
+		// Assuming Think is a method we can influence via a mock/interface
+		// or by providing a specific input that triggers a Think error.
+	}
+
+	appCtx, cancelApp := context.WithCancel(context.Background())
+	defer cancelApp()
+	var wg sync.WaitGroup
+
+	b.Start(appCtx, &wg)
+
+	// 1. Hit the Heartbeat Case
+	t.Run("Heartbeat_Pulse", func(t *testing.T) {
+		// Simply waiting for > heartbeat duration ensures the fmt.Println(".") branch is hit.
+		time.Sleep(fastHeartbeat * 2)
+	})
+
+	// 3. Reach Push context.Done() before query send
+	t.Run("Push_Send_Timeout", func(t *testing.T) {
+		deadCtx, cancel := context.WithCancel(context.Background())
+		cancel() // Context is already dead
+
+		_, err := b.Push(deadCtx, "test input")
+		assert.ErrorIs(t, err, context.Canceled, "Should reach the first ctx.Done() in Push")
+	})
+}
+
+func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
+	t.Run("Reach_Think_Error_Block", func(t *testing.T) {
+		mockRight := new(MockThinker)
+		b := &Whole{
+			right:        mockRight,
+			queries:      make(chan Query),
+			heartbeat:    5 * time.Millisecond,
+			maxQueryTime: 50 * time.Millisecond,
+		}
+
+		appCtx, cancelApp := context.WithCancel(context.Background())
+		defer cancelApp()
+		var wg sync.WaitGroup
+		b.Start(appCtx, &wg)
+
+		baseErr := errors.New("llm_failure")
+
+		// Satisfy the contract: Return a sentinel struct, not nil
+		sentinelResponse := &ErrorResponse{E: baseErr}
+
+		mockRight.On("Think", mock.Anything, mock.Anything, mock.Anything).
+			Return(sentinelResponse, baseErr).Once()
+
+		res, err := b.Push(context.Background(), "trigger error")
+
+		// Note: Push returns d.Verify(). If d is ErrorDecision, it returns the internal error.
+		assert.Error(t, err)
+		assert.Equal(t, err.Error(), "llm_failure")
+		assert.NotNil(t, res.IsError())
+		// er := ErrorResponse{}
+		// assert.True(t,errors.As(res.IsError(), &er))
+		// assert.Equal(t, er.Unwrap(), baseErr)
+		cancelApp()
+		wg.Wait()
+	})
+
+	t.Run("Push_Receive_Timeout_Second_Select", func(t *testing.T) {
+		mockRight := new(MockThinker)
+		b := &Whole{
+			right:        mockRight,
+			queries:      make(chan Query),
+			heartbeat:    5 * time.Millisecond,
+			maxQueryTime: 50 * time.Millisecond,
+		}
+
+		appCtx, cancelApp := context.WithCancel(context.Background())
+		defer cancelApp()
+		var wg sync.WaitGroup
+		b.Start(appCtx, &wg)
+
+		resp := new(MockResponse)
+		resp.On("IsError").Return(nil).Maybe()
+		dec := new(MockDecision)
+		dec.On("IsError").Return(nil).Maybe()
+
+		// Scenario: Think hangs, causing the Push caller to time out while waiting on chan 'c'
+		// We use a mock that blocks until the test context expires
+		mockRight.On("Think", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				time.Sleep(100 * time.Millisecond) // Exceeds Push timeout
+			}).
+			Return(resp, nil).Maybe()
+		mockRight.On("Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(dec, nil).Maybe()
+
+		// Request context with very short deadline
+		reqCtx, cancelReq := context.WithTimeout(context.Background(), 1*time.Millisecond)
+		defer cancelReq()
+
+		_, err := b.Push(reqCtx, "slow query")
+
+		// This hits the second <-ctx.Done() in Push
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		cancelApp()
+		wg.Wait()
 	})
 }

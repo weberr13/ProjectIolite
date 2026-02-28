@@ -29,3 +29,8 @@ func (m *MockResponse) Source() string {
 	args := m.Called()
 	return args.Get(0).(string)
 }
+
+func (m *MockResponse) IsError() error {
+	args := m.Called()
+	return args.Error(0)
+}

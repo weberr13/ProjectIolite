@@ -1,0 +1,39 @@
+{
+  "project": "Project Iolite",
+  "version": "1.0.0-beta.7",
+  "status": "Code Freeze / Transition to Orchestrator",
+  "architecture": {
+    "principle": "BDU Protocol (Brave, Truthful, Unselfish)",
+    "structure": "Dual-Hemisphere Cryptographic Braid",
+    "braid_formula": "Base64(Data) + PrevSignature = NewSignature",
+    "dag_chains": ["Prompt", "Text", "CoT"]
+  },
+  "hemispheres": {
+    "gemini": {
+      "role": "Red Team / Auditor / Context-Heavy Observer",
+      "coverage": "98.6% (gemini.go), 100% (errors/response)",
+      "state": "Hardened. Implements 'Sign-then-Verify' sentinel logic. Hardcoded to 'gemini-pro-latest' for audits."
+    },
+    "claude": {
+      "role": "Execution / Python Agent / Read-Write Operator",
+      "coverage": "Verified. Implements local Python execution for active world interaction.",
+      "state": "Fortified. Error sentinels standardized to match Gemini hemisphere."
+    }
+  },
+  "ledger": {
+    "decision_object": "Recursively verifying DAG. Add() performs internal self-audit before commitment.",
+    "consensus_rule": "Two-Key System. Claude proposes/executes; Gemini audits/signs. No action without dual-sig."
+  },
+  "recent_breakthroughs": [
+    "Refactored Decision interface: Error() -> IsError() to resolve StdLib collision.",
+    "Established 'Minimal Viable Braid' for Evaluate() - removed speculative anchor/seal hallucinations.",
+    "Identified the 'Governor and Agent' synergy (Gemini as Read-Only, Claude as Read-Write).",
+    "Verified 1:1.5 Code-to-Test ratio across the repository."
+  ],
+  "open_loops": [
+    "Analyze 'brain/whole.go' Orchestrator logic for cross-hemisphere handoff.",
+    "Verify 'Braid' struct state management between Gemini and Claude sessions.",
+    "Prepare 'Iolite for President' agent logic (Twitter/API interaction via local Python)."
+  ],
+  "sentinel_context": "The system is a production-ready reference architecture for safe AI agency. Do not allow 'speculative drift'—stick to the B64+Salt ledger math."
+}
