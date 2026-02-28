@@ -1,0 +1,30 @@
+name: Iolite Cryptographic Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-crypto:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest cryptography
+        # We need cryptography now to generate dynamic ground-truth vectors
+
+    - name: Run Ed25519 Logic Gate
+      run: |
+        # Ensure the project root is in PYTHONPATH so imports work
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        python -m pytest jwtwrapper/test_edDSA.py -v

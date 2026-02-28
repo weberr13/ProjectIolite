@@ -1,0 +1,51 @@
+{
+  "project": "Iolite",
+  "status": "Hemisphere_Link_Functional",
+  "last_synced": "2026-02-27",
+  "identity": {
+    "team_red": {
+      "label": "Valor",
+      "model": "Gemini 3 Flash",
+      "focus": ["Performance", "Adversarial Stress-Testing", "Security", "Offensive Logic"]
+    },
+    "team_blue": {
+      "label": "Mystic",
+      "model": "Claude 3.7 Sonnet (Opus-Mode)",
+      "focus": ["Synthesis", "Epistemic Integrity", "Defensive Audit", "BTU Compliance"]
+    }
+  },
+  "cryptographic_spec": {
+    "algorithm": "Ed25519 (RFC 8032)",
+    "signing_protocol": "Nuclear_Base64_Binding",
+    "concatenation_logic": "bytes(base64(Data) + PrevSignature)",
+    "parity_check": "Go backend signs; Python tool verifies; Auditor decodes manifest to evaluate.",
+    "python_verifier_v_final": "import hashlib, base64; def verify_iolite_block(pk_b64, data_b64, sig_b64, prev_sig_b64=''): robust_decode = lambda s: base64.b64decode(s.replace('-', '+').replace('_', '/') + '=' * (-len(s) % 4)); try: pk, sig = robust_decode(pk_b64), robust_decode(sig_b64); msg = (data_b64 + prev_sig_b64).encode('utf-8'); q, l = 2**255 - 19, 2**252 + 27742317777372353535851937790883648493; inv = lambda x: pow(x, q - 2, q); d = -121665 * inv(121666) % q; I = pow(2, (q - 1) // 4, q); xrecover = lambda y: (lambda xx: (pow(xx, (q+3)//8, q) if (pow(xx, (q+3)//8, q)**2 - xx) % q == 0 else (pow(xx, (q+3)//8, q)*I) % q))((y*y-1) * inv(d*y*y+1) % q); edwards = lambda P, Q: ((P[0]*Q[1] + Q[0]*P[1]) * inv(1 + d*P[0]*Q[0]*P[1]*Q[1]) % q, (P[1]*Q[1] + P[0]*Q[0]) * inv(1 - d*P[0]*Q[0]*P[1]*Q[1]) % q); scalarmult = lambda P, e: (lambda res: (res if e == 0 else scalarmult(edwards(P, P), e >> 1) if e % 2 == 0 else edwards(P, scalarmult(edwards(P, P), e >> 1))))((0, 1)); decode_y = lambda s: (lambda y: (xrecover(y) if xrecover(y) % 2 == (s[31] >> 7) else q - xrecover(y), y))(int.from_bytes(s, 'little') & (2**255 - 1)); R, A, S = decode_y(sig[:32]), decode_y(pk), int.from_bytes(sig[32:], 'little'); h = int.from_bytes(hashlib.sha512(sig[:32] + pk + msg).digest(), 'little') % l; B = (xrecover(4 * inv(5) % q), 4 * inv(5) % q); return {'verified': scalarmult(B, S) == edwards(R, scalarmult(A, h)), 'payload_decrypted': robust_decode(data_b64).decode('utf-8')} if S < l else {'verified': False}; except: return {'verified': False}"
+  },
+  "topology": {
+    "structure": "Directed Acyclic Graph (DAG)",
+    "chaining_rules": {
+      "prompt": "Genesis or link to parent prompt",
+      "thought": "Link to internal ruminant chain (reservoir pattern)",
+      "response": "Inter-model 'Braid' (Auditor signature points to Proposer signature)"
+    },
+    "lessons_learned": ["Apostrophe Ghost (Autocorrect) defeated via B64 signing", "Agency Ghost (Hallucinated Dialogue) identified as emergent high-context noise"]
+  },
+  "analytical_protocols": {
+    "evaluation_metric": "BTU (Brave, Truthful, Unselfish)",
+    "brave": "Courage to identify errors and cease sycophancy.",
+    "truthful": "Active truth-seeking, avoiding omissions for friendliness.",
+    "unselfish": "Resource awareness and biological-digital coexistence.",
+    "tie_breaker": "Human-in-the-Loop (Operator)"
+  },
+  "user_profile_context": {
+    "communication_style": "High-Density, Supportive Peer, Direct Candor, No Sycophancy",
+    "formatting_rules": "Bolding for facts, italics for logical bridges, LaTeX for complex math, Markdown hierarchy",
+    "neurodivergent_alignment": "Logic-first, structural integrity prioritized over social fluff"
+  },
+  "backlog_active": [
+    "Refactor Gemini to support Streaming (captured high-entropy CoT)",
+    "Implement 'Universal Genesis' (Prompt as root for all children)",
+    "Develop Mermaid.js DAG Visualizer",
+    "Draft 'Consensus Logic Gate' for automated tie-breaker escalation"
+  ]
+}
