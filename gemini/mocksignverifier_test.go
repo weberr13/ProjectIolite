@@ -19,7 +19,7 @@ func (m *MockSignVerifier) Verify(data, signature string) error {
 
 func (m *MockSignVerifier) ExportPublicKey() string {
 	args := m.Called()
-	return args.String()
+	return args.String(0)
 }
 
 func (m *MockSignVerifier) Alg() string {

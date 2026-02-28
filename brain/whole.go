@@ -57,7 +57,7 @@ type Decision interface {
 	Sign(SignVerifier) error
 	Verify(SignVerifier) error
 	Add(source string, cot []Signed, text Signed, sv SignVerifier) error
-	Error() error
+	IsError() error
 }
 
 type Whole struct {

@@ -56,3 +56,15 @@ func (e *GeminiError) Prompt() brain.Signed {
 func (e *GeminiError) Source() string {
 	return "gemini"
 }
+
+// Error implements the error interface.
+// We use the ":" separator which is standard for wrapped errors.
+func (e *GeminiError) Error() string {
+	return fmt.Sprintf("gemini: %v (input: %q)", e.e, e.input)
+}
+
+// Unwrap allows errors.Is and errors.As to access the internal error.
+// This is the "Magic Key" for the errors package.
+func (e *GeminiError) Unwrap() error {
+	return e.e
+}
