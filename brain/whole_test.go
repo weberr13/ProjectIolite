@@ -121,7 +121,7 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		// Assertions for the &ErrorDecision return
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
 		assert.IsType(t, &ErrorDecision{}, decision)
-		assert.Equal(t, ErrNoLLMBrain, decision.Error())
+		assert.Equal(t, ErrNoLLMBrain, decision.IsError())
 	})
 
 	t.Run("Branch 2: Right Only - Success Path", func(t *testing.T) {
@@ -161,7 +161,7 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 
 		// Verify the error is wrapped in ErrorDecision and returned
 		assert.ErrorIs(t, err, thinkErr)
-		assert.Equal(t, thinkErr, decision.Error())
+		assert.Equal(t, thinkErr, decision.IsError())
 
 		// Ensure Evaluate was NEVER called because Think failed
 		mockRight.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -188,7 +188,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 
 		assert.ErrorIs(t, err, leftErr)
 		assert.IsType(t, &ErrorDecision{}, decision)
-		assert.Equal(t, leftErr, decision.Error())
+		assert.Equal(t, leftErr, decision.IsError())
 		mockLeft.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
@@ -208,7 +208,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		decision, err := b.Think(ctx, prompt)
 
 		assert.ErrorIs(t, err, rightErr)
-		assert.Equal(t, rightErr, decision.Error())
+		assert.Equal(t, rightErr, decision.IsError())
 
 		// CRITICAL: Ensure the Left brain was never triggered because the Right brain failed at the source
 		mockLeft.AssertNotCalled(t, "Think", mock.Anything, mock.Anything, mock.Anything)
@@ -270,7 +270,7 @@ func TestWhole_Think_ContextSanity_Fixed(t *testing.T) {
 		// ASSERTIONS
 		assert.ErrorIs(t, err, expectedErr)
 		assert.NotNil(t, decision, "Think must ALWAYS return a Decision sentinel")
-		assert.Equal(t, expectedErr, decision.Error())
+		assert.Equal(t, expectedErr, decision.IsError())
 
 		mockRight.AssertExpectations(t)
 		mockLeft.AssertExpectations(t)

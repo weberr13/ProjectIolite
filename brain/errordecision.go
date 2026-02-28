@@ -36,6 +36,18 @@ func (e *ErrorResponse) Source() string {
 	return e.E.Error()
 }
 
+func (e *ErrorResponse) Error() string {
+	return fmt.Sprintf("system error: %v", e.E)
+}
+
+func (e *ErrorResponse) Unwrap() error {
+	return e.E
+}
+
+func (e *ErrorResponse) IsError() error {
+	return e.E
+}
+
 type ErrorDecision struct {
 	E error
 }
@@ -48,7 +60,15 @@ func (ErrorDecision) Prompts() map[string][]Signed {
 	return nil
 }
 
-func (e *ErrorDecision) Error() error {
+func (e *ErrorDecision) Error() string {
+	return fmt.Sprintf("system error: %v", e.E)
+}
+
+func (e *ErrorDecision) IsError() error {
+	return e.E
+}
+
+func (e *ErrorDecision) Unwrap() error {
 	return e.E
 }
 

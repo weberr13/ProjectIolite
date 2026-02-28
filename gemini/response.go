@@ -29,15 +29,25 @@ func (r *GeminiResponse) Source() string {
 
 func candidatesToThoughts(resp *genai.GenerateContentResponse) []brain.Signed {
 	thoughts := []brain.Signed{}
+	if resp == nil { // Global safety
+		return thoughts
+	}
 	for _, c := range resp.Candidates {
+		// Guard against nil candidates or missing content
+		if c == nil || c.Content == nil {
+			continue
+		}
 		for _, p := range c.Content.Parts {
-			if p.Thought {
-				last := len(thoughts) - 1
-				if last < 0 {
-					thoughts = append(thoughts, brain.NewUnsigned(p.Text, "cot"))
-				} else {
-					thoughts = append(thoughts, thoughts[last].NextUnsigned(p.Text))
-				}
+			// Guard against nil parts
+			if p == nil || !p.Thought {
+				continue
+			}
+
+			last := len(thoughts) - 1
+			if last < 0 {
+				thoughts = append(thoughts, brain.NewUnsigned(p.Text, "cot"))
+			} else {
+				thoughts = append(thoughts, thoughts[last].NextUnsigned(p.Text))
 			}
 		}
 	}
@@ -66,21 +76,26 @@ func (r *GeminiResponse) Sign(sv brain.SignVerifier) error {
 	if r.thought == nil {
 		_ = r.Text()
 	}
+
 	if r.prompt.Signature == "" {
-		err := r.prompt.Sign(sv)
-		if err != nil {
+		if err := r.prompt.Sign(sv); err != nil {
 			return err
 		}
 	}
-	var err error
+
+	// 2. Chain the thoughts
+	lastSig := "" // TODO: r.prompt.Signature Start with the prompt's signature
 	for i := range r.cot {
-		err = r.cot[i].Sign(sv)
-		if err != nil {
+		r.cot[i].PrevSignature = lastSig // STITCH THE CHAIN
+		if err := r.cot[i].Sign(sv); err != nil {
 			return err
 		}
+		lastSig = r.cot[i].Signature
 	}
-	err = r.thought.Sign(sv)
-	return err
+
+	// 3. Chain the final output to the last thought
+	r.thought.PrevSignature = lastSig
+	return r.thought.Sign(sv)
 }
 
 func (r *GeminiResponse) Verify(sv brain.SignVerifier) error {

@@ -56,3 +56,13 @@ func (e *ClaudeError) Prompt() brain.Signed {
 func (e *ClaudeError) Source() string {
 	return "claude"
 }
+
+func (e *ClaudeError) Error() string {
+	// Standardized prefixing for log aggregation
+	return fmt.Sprintf("claude: %v (input: %q)", e.e, e.input)
+}
+
+func (e *ClaudeError) Unwrap() error {
+	// The "Magic Key" that allows callers to see the root cause
+	return e.e
+}

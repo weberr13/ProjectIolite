@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"google.golang.org/genai"
@@ -44,6 +45,12 @@ func WithModel(model string) Option {
 	}
 }
 
+// Add this internal variable to the package
+var (
+	newClient   = genai.NewClient
+	newClientMX sync.Mutex
+)
+
 func New(ctx context.Context, apikey string, opts ...Option) (*Gemini, error) {
 	if apikey == "" {
 		return nil, ErrNoKeyFound
@@ -56,7 +63,9 @@ func New(ctx context.Context, apikey string, opts ...Option) (*Gemini, error) {
 		o(g)
 	}
 
-	client, err := genai.NewClient(ctx, g.cfg)
+	newClientMX.Lock()
+	client, err := newClient(ctx, g.cfg)
+	newClientMX.Unlock()
 	if err != nil {
 		return nil, err
 	}

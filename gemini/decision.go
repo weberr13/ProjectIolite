@@ -39,7 +39,7 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, e
 	return d, err
 }
 
-func (e *GeminiDecision) Error() error {
+func (e *GeminiDecision) IsError() error {
 	return nil
 }
 

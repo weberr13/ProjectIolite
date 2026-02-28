@@ -46,12 +46,12 @@ func TestErrorDecision_Interface(t *testing.T) {
 		assert.NoError(t, err, "Add should return nil even if it wraps an internal error")
 
 		// Verify the error wrapping logic: "text.Data: original_error"
-		currentErrStr := ed.Error().Error()
+		currentErrStr := ed.Unwrap().Error()
 		assert.Contains(t, currentErrStr, "verification_failed")
 		assert.Contains(t, currentErrStr, "root_cause")
 
 		// Check unwrapping (standard Go error behavior)
-		assert.True(t, errors.Is(ed.Error(), ed.E))
+		assert.True(t, errors.Is(ed.Unwrap(), ed.E))
 	})
 
 	t.Run("No-Op Safety", func(t *testing.T) {

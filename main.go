@@ -52,8 +52,8 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 				http.Error(w, err.Error(), http.StatusGatewayTimeout)
 				return
 			}
-			if decision.Error() != nil {
-				http.Error(w, decision.Error().Error(), http.StatusInternalServerError)
+			if decision.IsError() != nil {
+				http.Error(w, decision.IsError().Error(), http.StatusInternalServerError)
 				return
 			}
 

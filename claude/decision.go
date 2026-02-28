@@ -40,7 +40,7 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*ClaudeDecision, e
 	return d, err
 }
 
-func (e *ClaudeDecision) Error() error {
+func (e *ClaudeDecision) IsError() error {
 	return nil
 }
 
