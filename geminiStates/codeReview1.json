@@ -1,0 +1,33 @@
+{
+  "project": "Iolite",
+  "version": "1.0.0-alpha.hydration",
+  "last_updated": "2026-02-27T20:54:00Z",
+  "instruction_set": {
+    "architectural_contracts": {
+      "nil_pointer_policy": "STRICT_SENTINEL",
+      "rule": "Every interface-returning function (Think, Evaluate, NewDecision) MUST return a valid sentinel object on error. Returning (nil, err) is a 'Poison Pill' that violates the Braid Orchestrator contract.",
+      "failure_mode_found": "Evaluate returned (nil, err) when NewDecision failed, leading to an untested crash path in the Whole.Think loop."
+    },
+    "test_design_rigor": {
+      "mock_isolation_policy": "BINARY_PURITY",
+      "rule": "Mocks and test dependencies (testify/mock) MUST live exclusively in *_test.go files. Never move mocks to standard .go files to avoid 'init()' backdoors and production binary bloat.",
+      "interface_segregation": "Use local 'Sliver Interfaces' (e.g., CanSignOrVerify) in test files to mock only the necessary method surface. This reduces coupling and improves 'Diagnostic Probes'."
+    },
+    "memory_safety": {
+      "dereference_guard": "POINTER_VALIDATION",
+      "rule": "Before dereferencing a pointer returned by a mock or a helper (e.g., *init.Text()), the code must be proven safe. Mocks must return valid pointers to structs (even empty ones) to satisfy the CPU's requirement for memory addresses.",
+      "failure_mode_found": "NewDecision panicked at line 33 because the mock returned a literal nil for a field that was immediately dereferenced."
+    },
+    "diagnostic_methodology": {
+      "probe_sequence": "PATH_TRAVERSAL",
+      "rule": "Do not 'fix the code with your eyes.' Write a test that physically traverses the execution path to 'find' the bug. If a dependency (like genai.Client) blocks the path, refactor to an interface (ContentGenerator) rather than bypassing the test.",
+      "logic_gate_verification": "Tests must account for internal data transformations (Base64 encoding, Signature concatenation) to avoid 'Unexpected Method Call' panics."
+    }
+  },
+  "mistakes_to_avoid": [
+    "Testing the Mock: Assuming a mock's internal state matches the code's data-handling reality.",
+    "Scope Hallucination: Assuming a local test utility is a package-wide asset.",
+    "Sycophantic Fixing: Suggesting code changes to satisfy a flawed test rather than fixing the test's architecture.",
+    "Tunnel Vision: Focusing on a logic error while ignoring the SIGSEGV panics occurring upstream."
+  ]
+}

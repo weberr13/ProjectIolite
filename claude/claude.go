@@ -18,14 +18,22 @@ import (
 	"github.com/weberr13/ProjectIolite/brain"
 )
 
+type MessageGenerator interface {
+	New(ctx context.Context, params anthropic.MessageNewParams, opts ...option.RequestOption) (*anthropic.Message, error)
+}
+
 type Claude struct {
-	cl *anthropic.Client
+	cl        *anthropic.Client
+	generator MessageGenerator // The Sliver Interface
+	runner    ScriptRunner
 }
 
 type Option func(b *Claude)
 
 func New(apiKey string, opts ...Option) (*Claude, error) {
-	c := &Claude{}
+	c := &Claude{
+		runner: &RealRunner{},
+	}
 	for _, o := range opts {
 		o(c)
 	}
@@ -33,6 +41,7 @@ func New(apiKey string, opts ...Option) (*Claude, error) {
 		option.WithAPIKey(apiKey),
 	)
 	c.cl = &client
+	c.generator = &c.cl.Messages
 	return c, nil
 }
 
@@ -42,12 +51,15 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	defer func() {
 		log.Printf("Think took: %v", time.Since(now))
 	}()
+	if c.generator == nil {
+		return &brain.ErrorResponse{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
+	}
 	prompt := brain.NewUnsigned(input.Text(), "prompt")
 	err := prompt.Sign(sv)
 	if err != nil {
 		return &ClaudeError{e: err}, err
 	}
-	message, err := c.cl.Messages.New(ctx, anthropic.MessageNewParams{
+	message, err := c.generator.New(ctx, anthropic.MessageNewParams{
 		MaxTokens: 1024 * 4,
 		Thinking: anthropic.ThinkingConfigParamUnion{
 			OfEnabled: &anthropic.ThinkingConfigEnabledParam{
@@ -96,11 +108,28 @@ func (c *Claude) pytool() *anthropic.ToolParam {
 	}
 }
 
-// Add these to your imports: "os/exec", "bytes", "strings", "fmt"
+type ScriptRunner interface {
+	Run(ctx context.Context, code string) (string, error)
+}
 
-func executePython(tooluse anthropic.ToolUseBlock) (string, error) {
-	// 1. Extract the code from Claude's ToolUse input
-	// The Input field is a raw JSON message from the SDK
+// RealRunner is the production implementation
+type RealRunner struct{}
+
+func (r *RealRunner) Run(ctx context.Context, code string) (string, error) {
+	cmd := exec.CommandContext(ctx, "python3", "-")
+	cmd.Stdin = strings.NewReader(code)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("PYTHON ERROR:\n%s\n%s", stderr.String(), err.Error())
+	}
+	return stdout.String(), nil
+}
+
+func executePython(ctx context.Context, runner ScriptRunner, tooluse anthropic.ToolUseBlock) (string, error) {
 	var input struct {
 		Code string `json:"code"`
 	}
@@ -108,24 +137,13 @@ func executePython(tooluse anthropic.ToolUseBlock) (string, error) {
 		return "", fmt.Errorf("failed to parse tool input: %w", err)
 	}
 
-	// 2. Prepare the python3 command
-	// We use STDIN to avoid shell escaping issues with long scripts
-	cmd := exec.Command("python3", "-")
-	cmd.Stdin = strings.NewReader(input.Code)
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	// 3. Fire the Piston
-	err := cmd.Run()
+	output, err := runner.Run(ctx, input.Code)
 	if err != nil {
-		// We return the error string as the tool result so Claude can "see"
-		// the traceback and try to fix its own code.
-		return fmt.Sprintf("PYTHON ERROR:\n%s\n%s", stderr.String(), err.Error()), nil
+		// We return the error string as the result so the LLM can recover
+		return err.Error(), nil
 	}
 
-	return stdout.String(), nil
+	return output, nil
 }
 
 // Evaluate audits another brain's output
@@ -134,6 +152,9 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	defer func() {
 		log.Printf("Evaluate took: %v", time.Since(now))
 	}()
+	if c.generator == nil {
+		return &brain.ErrorDecision{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
+	}
 	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
 	if prev != nil {
 		s, _ := json.MarshalIndent(prev, " ", " ")
@@ -172,7 +193,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		Model:       anthropic.ModelClaudeOpus4_6,
 	}
 
-	message, err := c.cl.Messages.New(ctx, params)
+	message, err := c.generator.New(ctx, params)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
@@ -207,7 +228,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			if block.Type == "tool_use" {
 				toolUse := block.AsToolUse()
 				log.Printf("tool request: %#v", toolUse)
-				result, err := executePython(toolUse)
+				result, err := executePython(ctx, c.runner, toolUse)
 				isErr := false
 				if err != nil {
 					isErr = true
@@ -220,7 +241,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		if len(toolResults) > 0 {
 			params.Messages = append(params.Messages, anthropic.NewUserMessage(toolResults...))
 		}
-		message, err = c.cl.Messages.New(ctx, params)
+		message, err = c.generator.New(ctx, params)
 		if err != nil {
 			return &brain.ErrorDecision{E: err}, err
 		}
