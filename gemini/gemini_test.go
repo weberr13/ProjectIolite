@@ -99,15 +99,14 @@ func TestGemini_Evaluate_NoNil(t *testing.T) {
 		// Remove .Once() and use .Return() to ensure that NO MATTER how many
 		// times NewDecision or its internal loops call Verify, it always
 		// fails with our specific error.
-		mockSV.On("Verify", mock.Anything, mock.Anything).Return(verifyErr)
-		mockSV.On("Sign", mock.Anything).Return("fakeSig", nil)
+		mockPeerResp.On("Verify", mock.Anything).Return(verifyErr)
 
 		dec, err := g.Evaluate(ctx, mockSV, mockPeerResp, nil)
 
 		// ASSERTIONS
 		assert.ErrorIs(t, err, verifyErr)
 		assert.NotNil(t, dec, "Contract Breach: Evaluate returned nil")
-		assert.IsType(t, &GeminiDecision{}, dec)
+		assert.IsType(t, &brain.ErrorDecision{}, dec)
 
 		mockGen.AssertExpectations(t)
 		// We check expectations to ensure Verify was actually called
@@ -146,8 +145,7 @@ func TestGemini_Evaluate_RevealTheNil(t *testing.T) {
 		// We mock Verify to return an error. This skips the dereference
 		// at line 33 and goes straight to: return nil, err
 		verifyErr := errors.New("corrupted_response_signature")
-		mockSV.On("Verify", mock.Anything, mock.Anything).Return(verifyErr)
-		mockSV.On("Sign", mock.Anything).Return("fakeSig", nil)
+		mockPeerResp.On("Verify", mock.Anything).Return(verifyErr)
 
 		// 4. EXECUTION
 		decision, err := g.Evaluate(ctx, mockSV, mockPeerResp, nil)

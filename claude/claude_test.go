@@ -55,15 +55,14 @@ func TestClaude_Evaluate_NoNil(t *testing.T) {
 		// 3. THE TARGET: Force NewDecision to fail
 		// We use brain.ErrUnsigned to simulate a failed integrity check
 		verifyErr := brain.ErrUnsigned
-		mockSV.On("Verify", mock.Anything, mock.Anything).Return(verifyErr)
-		mockSV.On("Sign", mock.Anything).Return("fakeSig", nil)
+		mockPeerResp.On("Verify", mockSV).Return(verifyErr).Once()
 
 		decision, err := c.Evaluate(ctx, mockSV, mockPeerResp, nil)
 
 		// ASSERTIONS: Ensure no (nil, err) is returned
 		assert.ErrorIs(t, err, verifyErr)
 		assert.NotNil(t, decision, "THE BUG: Claude.Evaluate returned nil on NewDecision failure")
-		assert.IsType(t, &ClaudeDecision{}, decision)
+		assert.IsType(t, &brain.ErrorDecision{}, decision)
 	})
 }
 
@@ -245,13 +244,14 @@ func TestClaude_Evaluate_ToolUseLoop(t *testing.T) {
 		// If you are using RealRunner, this will actually try to hit python3.
 		// If you've abstracted it, we mock it here:
 		// mockRunner.On("Run", mock.Anything, "print(1+1)").Return("2\n", nil).Once()
+		mockPeerResp.On("Verify", mockSV).Return(nil).Maybe()
 
 		decision, err := c.Evaluate(ctx, mockSV, mockPeerResp, nil)
 
 		// ASSERTIONS
 		assert.NoError(t, err)
 		assert.NotNil(t, decision)
-		assert.Contains(t, decision.Texts()["claude"][1].Data, "Approved: true")
+		assert.Contains(t, decision.Texts()["claude"][0].Data, "Approved: true")
 
 		mockGen.AssertExpectations(t)
 	})
