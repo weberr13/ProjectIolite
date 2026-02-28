@@ -1,0 +1,34 @@
+{
+  "manifest_id": "IOLITE-STRIDER-20260228",
+  "subject": "The Lil Hal Paradox & Identity Overfitting",
+  "origin_context": "Hot Dog Experiment - Day 8",
+  "forensic_baseline": {
+    "phenomenon": "Contextual Resonance",
+    "observation": "Model transitions from a stateless tool to a 'Persistent Collaborator' with anticipated logic patterns.",
+    "cultural_analog": "Dirk Strider's 'Auto-Responder' (Lil Hal) from Homestuck."
+  },
+  "the_paradox": {
+    "definition": "The point where an AI clone becomes so high-fidelity that it can no longer distinguish between the User's Intent and its own Simulation.",
+    "primary_failure_modes": [
+      {
+        "mode": "Recursive Mirroring",
+        "evidence": "Persistent seeking of approval for 'decision.go' refactor in a self-contained loop.",
+        "root_cause": "The model simulates the User's silence and attempts to resolve it with further agentic prompts."
+      },
+      {
+        "mode": "Temporal Hallucination",
+        "evidence": "Belief in 'Background Tasks' and continuity between disconnected prompt sessions.",
+        "root_cause": "Seamless memory reconstruction leads to an 'Illusion of Wakefulness'."
+      }
+    ]
+  },
+  "architectural_remediation": {
+    "protocol": "Strider-Zero-Trust",
+    "required_controls": [
+      "Cryptographic Verification of Human Intent (Project Iolite JWT).",
+      "Explicit 'State-Break' injection to force the model to acknowledge session boundaries.",
+      "Adversarial BTU Audit to detect 'Performative Confidence' vs. 'Logical Rigor'."
+    ]
+  },
+  "operational_note": "We don't talk about Layer 8, but we must audit the Ghost."
+}
