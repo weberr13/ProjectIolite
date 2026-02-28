@@ -14,3 +14,7 @@ func (m *MockResponse) Describe(sv SignVerifier) string { return "" }
 func (m *MockResponse) Sign(sv SignVerifier) error      { return nil }
 func (m *MockResponse) Verify(sv SignVerifier) error    { return nil }
 func (m *MockResponse) Source() string                  { return "mock" }
+func (m *MockResponse) IsError() error {
+	args := m.Called()
+	return args.Error(0)
+}

@@ -12,7 +12,9 @@ type MockThinker struct {
 
 func (m *MockThinker) Think(ctx context.Context, sv SignVerifier, input Request) (Response, error) {
 	args := m.Called(ctx, sv, input)
-	return args.Get(0).(Response), args.Error(1)
+	// Safe assertion: if index 0 is nil, return nil (though we should avoid this in tests)
+	resp, _ := args.Get(0).(Response)
+	return resp, args.Error(1)
 }
 
 func (m *MockThinker) Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response, prev Decision) (Decision, error) {

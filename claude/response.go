@@ -96,6 +96,10 @@ func (r *ClaudeResponse) Verify(sv brain.SignVerifier) error {
 	return r.thought.Verify(sv)
 }
 
+func (r *ClaudeResponse) IsError() error {
+	return nil
+}
+
 func objToString(v any) string {
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)

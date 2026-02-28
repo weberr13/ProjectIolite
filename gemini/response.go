@@ -112,6 +112,10 @@ func (r *GeminiResponse) Verify(sv brain.SignVerifier) error {
 	return r.thought.Verify(sv)
 }
 
+func (r *GeminiResponse) IsError() error {
+	return nil
+}
+
 func objToString(v any) string {
 	buffer := &bytes.Buffer{}
 	encoder := json.NewEncoder(buffer)
