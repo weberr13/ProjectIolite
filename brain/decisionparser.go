@@ -10,12 +10,17 @@ import (
 
 type DecisionParser struct{}
 
+var findExpression = regexp.MustCompile("(?s)```(?:json)?\\s*(.*?)\\s*```")
+
 type HasTexts interface {
 	Texts() map[string][]Signed // map of model -> turn responses
 	// Prompts() map[string][]Signed // the sequence of prompts given to each model
 }
 
 func (p *DecisionParser) IsApproved(sv SignVerifier, dec HasTexts) (bool, error) {
+	if sv == nil {
+		return false, ErrNoConsensus
+	}
 	texts := dec.Texts()
 
 	// TODO: once the prompt signs the text chain find the prompt with PrevSignature == "" and use it
@@ -85,8 +90,7 @@ func (p *DecisionParser) IsApproved(sv SignVerifier, dec HasTexts) (bool, error)
 
 func parseForJsonBlocks(data string) [][]byte {
 	var allJsons [][]byte
-	re := regexp.MustCompile("(?s)```(?:json)?\n(.*?)\n```")
-	matches := re.FindAllStringSubmatch(data, -1)
+	matches := findExpression.FindAllStringSubmatch(data, -1)
 
 	for _, match := range matches {
 		rawContent := strings.TrimSpace(match[1])

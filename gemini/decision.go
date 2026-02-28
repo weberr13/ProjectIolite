@@ -10,6 +10,7 @@ type GeminiDecision struct {
 	ChainOfThoughts map[string][][]brain.Signed
 	AllPrompts      map[string][]brain.Signed
 	AllTexts        map[string][]brain.Signed
+	e               error
 }
 
 func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, error) {
@@ -40,7 +41,11 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*GeminiDecision, e
 }
 
 func (e *GeminiDecision) IsError() error {
-	return nil
+	return e.e
+}
+
+func (e *GeminiDecision) SetError(err error) {
+	e.e = err
 }
 
 func (d *GeminiDecision) Sign(sv brain.SignVerifier) error {

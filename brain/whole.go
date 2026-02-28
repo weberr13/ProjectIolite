@@ -13,6 +13,7 @@ var (
 	ErrNoSignVerifier = errors.New("required sign and verify wrapper not found")
 	ErrNoLLMBrain     = errors.New("at least model must be connected")
 	ErrNotImplemented = errors.New("not implemented")
+	ErrNoConsensus    = errors.New("no consensus was reached in the given response")
 )
 
 type SignVerifier interface {
@@ -59,6 +60,7 @@ type Decision interface {
 	Verify(SignVerifier) error
 	Add(source string, cot []Signed, text Signed, sv SignVerifier) error
 	IsError() error
+	SetError(error)
 }
 
 type Whole struct {
@@ -126,7 +128,10 @@ func (b *Whole) Ready() error {
 	return nil
 }
 
-func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
+func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser) (Decision, error) {
+	var dec Decision
+	var cycleErr error
+
 	switch {
 	case b.left == nil && b.right == nil:
 		log.Printf("tried to think but no brains detected")
@@ -143,7 +148,7 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 		}
-		return b.right.Evaluate(ctx, b.signVerifier, resp, nil)
+		dec, cycleErr = b.right.Evaluate(ctx, b.signVerifier, resp, nil)
 	case b.right == nil:
 		resp, err := b.left.Think(ctx, b.signVerifier, Request{T: prompt})
 		if err != nil {
@@ -156,21 +161,36 @@ func (b *Whole) Think(ctx context.Context, prompt string) (Decision, error) {
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 		}
-		return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
+		dec, cycleErr = b.left.Evaluate(ctx, b.signVerifier, resp, nil)
+	default:
+		resp, err := b.right.Think(ctx, b.signVerifier, Request{T: prompt})
+		if err != nil {
+			log.Printf("tried to right think but failed: %s", err)
+			return &ErrorDecision{E: err}, err
+		}
+		if resp == nil {
+			return &ErrorDecision{E: ErrNoLLMBrain}, err
+		}
+		if resp.IsError() != nil {
+			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
+		}
+		dec, cycleErr = b.left.Evaluate(ctx, b.signVerifier, resp, nil)
 	}
-	// TODO: we need to check if the response is accepted/loop/etc
-	resp, err := b.right.Think(ctx, b.signVerifier, Request{T: prompt})
+	if cycleErr != nil {
+		return dec, cycleErr
+	}
+	if dec.IsError() != nil {
+		return dec, cycleErr
+	}
+	app, err := parser.IsApproved(b.signVerifier, dec)
+	if app && err == nil {
+		return dec, nil
+	}
 	if err != nil {
-		log.Printf("tried to right think but failed: %s", err)
-		return &ErrorDecision{E: err}, err
+		return dec, err
 	}
-	if resp == nil {
-		return &ErrorDecision{E: ErrNoLLMBrain}, err
-	}
-	if resp.IsError() != nil {
-		return &ErrorDecision{E: resp.IsError()}, resp.IsError()
-	}
-	return b.left.Evaluate(ctx, b.signVerifier, resp, nil)
+	// TODO: we need to loop back and reach consensus
+	return dec, ErrNoConsensus
 
 	// TODO: when we have 2 halves we can implement the debate logic
 
@@ -206,11 +226,15 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 					log.Printf("received query %#v", q)
 					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime)
 					defer cancel()
-					d, err := b.Think(ctx, q.input)
+					d, err := b.Think(ctx, q.input, &DecisionParser{})
 					if err != nil {
-						log.Printf("could not think: %#v, %s", d, err)
-						d = &ErrorDecision{
-							E: err,
+						if err == ErrNoConsensus {
+							d.SetError(err)
+						} else {
+							log.Printf("could not think: %#v, %s", d, err)
+							d = &ErrorDecision{
+								E: err,
+							}
 						}
 					}
 					select {
