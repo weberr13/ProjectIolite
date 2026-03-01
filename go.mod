@@ -7,6 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
+	github.com/mvrilo/go-redoc v0.1.5
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/text v0.34.0
 	google.golang.org/genai v1.48.0

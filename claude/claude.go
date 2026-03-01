@@ -174,7 +174,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		"This software under active development: if there is a failure in the first verification attempt DO NOT ATTEMPT TO DEBUG THE MESSAGE! Report the error and continlue analysis. if you do not have a base64 string then skip it." +
 		"POST-VERIFICATION: Once the signatures are verified (or fail), you MUST provide a full BTU evaluation. " +
 		"Do not just report the math. Synthesis the given proposal offer the counter-perspective. " +
-		"Your final response MUST be a complete analytical report, concluding with the approved: true/false JSON." +
+		brain.AuditInstruction +
 		"Script: " + sv.VerifyPy()
 	log.Printf("using model instructions: %s", instruction)
 

@@ -3,13 +3,11 @@ package brain
 import (
 	"encoding/base64"
 	"encoding/json"
-	"regexp"
+	"log"
 	"strings"
 )
 
 type DecisionParser struct{}
-
-var findExpression = regexp.MustCompile("(?s)```(?:json)?\\s*(.*?)\\s*```")
 
 type HasTexts interface {
 	Texts() map[string][]Signed // map of model -> turn responses
@@ -71,25 +69,12 @@ func (p *DecisionParser) IsApproved(sv SignVerifier, dec HasTexts) (bool, error)
 
 			jsons := parseForJsonBlocks(payload)
 			for i := len(jsons) - 1; i >= 0; i-- {
-				var m map[string]any
-				if err := json.Unmarshal(jsons[i], &m); err != nil {
-					continue // Skip unparseable JSON
-				}
-
-				// Type-safe extraction of the decision
-				val, ok := m["accepted"].(bool)
-				if !ok {
-					val, ok = m["approved"].(bool)
-				}
-
-				if ok {
-					// We found a valid boolean opinion!
-					// Since we are walking backwards from the Terminal Leaf,
-					// the first valid bool we find is the "Global Winner."
-					if !foundOpinion {
-						verdict = val
-						foundOpinion = true
-					}
+				// We found a valid Audit
+				// Since we are walking backwards from the Terminal Leaf,
+				// the first valid decision we find is the "Global Winner."
+				if !foundOpinion {
+					verdict = jsons[i].Accepted()
+					foundOpinion = true
 				}
 			}
 		}
@@ -109,18 +94,34 @@ func (p *DecisionParser) IsApproved(sv SignVerifier, dec HasTexts) (bool, error)
 	return verdict, nil
 }
 
-func parseForJsonBlocks(data string) [][]byte {
-	var allJsons [][]byte
-	matches := findExpression.FindAllStringSubmatch(data, -1)
+func parseForJsonBlocks(data string, passthroughMatches ...bool) []Audit {
+	var allAudits []Audit
+	matches := AuditRegex.FindAllStringSubmatch(data, -1)
 
 	for _, match := range matches {
-		rawContent := strings.TrimSpace(match[1])
+		rawContent := strings.TrimSpace(match[0])
 
 		// Try raw JSON first - this is the BTU 'Truthful' approach
 		if json.Valid([]byte(rawContent)) {
-			allJsons = append(allJsons, []byte(rawContent))
+			a := Audit{
+				Raw: rawContent,
+			}
+			err := json.Unmarshal([]byte(rawContent), &a)
+			if err != nil {
+				log.Printf("could not parse audit %s: %s", rawContent, err)
+				continue
+			}
+			if len(passthroughMatches) == 0 || !passthroughMatches[0] {
+				err = a.Validate()
+				if err != nil {
+					log.Printf("could not validate audit %s: %s", rawContent, err)
+					continue
+				}
+			}
+
+			allAudits = append(allAudits, a)
 			continue
 		}
 	}
-	return allJsons
+	return allAudits
 }

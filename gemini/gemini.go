@@ -139,7 +139,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		"This software under active development: if there is a failure in the first verification attempt DO NOT ATTEMPT TO DEBUG THE MESSAGE! Report the error and continlue analysis. if you do not have a base64 string then skip it." +
 		"STRUCTURAL DAG RULES: Prompts link to Prompts. Thoughts (CoT) link to your internal ruminant chain. Responses link to the previous Response in the global result chain. " +
 		"POST-VERIFICATION: Report signature validity for each block. Then, provide a BTU (Brave, Truthful, Unselfish) evaluation of the content. Challenge the opposing team's logic aggressively but fairly. " +
-		"Your final response must conclude with the approved: true/false JSON. " +
+		brain.AuditInstruction +
 		"Script: " + sv.VerifyPy(),
 	)
 	// }

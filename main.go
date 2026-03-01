@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"embed"
 	"encoding/json"
 	"flag"
 	"log"
@@ -17,26 +18,57 @@ import (
 	"github.com/weberr13/ProjectIolite/brain"
 	"github.com/weberr13/ProjectIolite/claude"
 	"github.com/weberr13/ProjectIolite/gemini"
-
-	// "github.com/weberr13/ProjectIolite/gemini"
 	"github.com/weberr13/ProjectIolite/jwtwrapper"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/mvrilo/go-redoc"
 )
+
+//go:embed api.yaml examples/*.json
+var StaticAssets embed.FS
+
+func setupDocs(r *chi.Mux) {
+	// 🛡️ [FORENSIC ANCHOR]: Use the root FS to avoid path resolution 'Greebles'
+	// This ensures that /examples/6.json maps correctly to the embedded examples/6.json
+	r.Handle("/examples/*", http.FileServer(http.FS(StaticAssets)))
+
+	doc := redoc.Redoc{
+		Title:       "Iolite API",
+		Description: "Forensic AI Alignment & Integrity Audit",
+		SpecFile:    "api.yaml",
+		SpecFS:      &StaticAssets,
+		SpecPath:    "/api.yaml",
+		DocsPath:    "/docs",
+	}
+
+	r.Get(doc.DocsPath, doc.Handler())
+
+	// Serve the spec directly from the embed root
+	r.Get(doc.SpecPath, func(w http.ResponseWriter, r *http.Request) {
+		data, err := StaticAssets.ReadFile("api.yaml")
+		if err != nil {
+			http.Error(w, "Blueprint missing", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-yaml")
+		w.Write(data)
+	})
+}
 
 func setupRouter(backend *brain.Whole) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	setupDocs(r)
 	r.Route("/v1", func(r chi.Router) {
 		r.Post("/think", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				Prompt string `json:"prompt"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, "Greeble detected in JSON", http.StatusBadRequest)
+				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
 				return
 			}
 

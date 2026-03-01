@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+echo "🛡️ [IOLITE_INTEGRITY_CHECK]: Beginning Forensic Audit..."
+
+# 1. Formatting & Imports
+echo "📝 Tidying and Formatting..."
+goimports -w -l .
+gofumpt -w -l .
+go mod tidy
+
+# 2. Standard Logic Verification
+echo "🧪 Running Unit Tests with Race Detection..."
+go test -race ./...
+
+# 3. Mutative Hardening
+echo "🧬 Running Fuzzing Heartbeat (5s)..."
+go test -fuzz=FuzzAuditParser -fuzztime=5s ./brain/...
+
+echo "📖 Validating OpenAPI Spec..."
+if command -v vacuum &> /dev/null; then
+    vacuum lint api.yaml
+elif command -v spectral &> /dev/null; then
+    spectral lint api.yaml
+else
+    echo "⚠️ Warning: No OpenAPI linter found. Skipping spec validation."
+fi
+
+echo "✅ [SUCCESS]: Braid Integrity Verified. Proceeding with commit."

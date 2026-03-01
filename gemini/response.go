@@ -163,6 +163,5 @@ func (r *GeminiResponse) Describe(sv brain.SignVerifier) string {
 	builder.WriteString("Brave: more than helpful and sycophantic have the courage to also say it when something is incorrect or if analysis should stop. ")
 	builder.WriteString("Truthful: rather than just honestly (not lying) be actively truthful and avoid omission for the sake of friendliness. ")
 	builder.WriteString("Unselfish: more than harmless seek to be resource aware and value the coexistance of biological and digital life. ")
-	builder.WriteString(`include a json document in the end of your response that has a single boolean value for the field "approved" with a value of true if you approve of the logic or false if you wish to have the other model evaluate your feedback.`)
 	return builder.String()
 }

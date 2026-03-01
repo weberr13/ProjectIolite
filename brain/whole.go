@@ -211,17 +211,61 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 	// last result "wins" (a small number)
 }
 
+func (b *Whole) internalTests(ctx context.Context, fuzzCylces int) {
+	fmt.Printf("running %d Audit Fuzz tests...", fuzzCylces)
+	err := AuditFuzzCycle(ctx, fuzzCylces)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("fuzz complete")
+}
+
 func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
+	targetDuration := b.heartbeat / time.Duration(100)
 	wg.Go(func() {
+		fuzzCycles := 5000
 		for {
 			select {
 			case <-appCtx.Done():
 				return
 			case <-time.After(b.heartbeat):
-				fmt.Println(".")
-				// do things to keep the 2 halves of the brain "fresh" here while the application is idle
-				// * allow them to "speak" to eachother with a slow rate (hourly?)
-				// * allow them to "ruminate" on old prompts that are resolved but high interest (entropy values?)
+				func() {
+					now := time.Now()
+					statusIcon := "🔄" // Default adjusting icon
+
+					defer func() {
+						took := time.Since(now)
+
+						// 🛡️ [FORENSIC ANCHOR]: Adaptive PID with Deadband & Variance Smoothing
+						if took > 0 {
+							delta := float64(took - targetDuration)
+							errorPercent := delta / float64(targetDuration)
+
+							// 🛑 [HEURISTIC CUTOFF]: 5% Deadband
+							if errorPercent > -0.05 && errorPercent < 0.05 {
+								statusIcon = "🔒" // Locked into steady-state
+							} else {
+								velocity := float64(fuzzCycles) / float64(took.Nanoseconds())
+								newTargetCycles := int(velocity * float64(targetDuration.Nanoseconds()))
+
+								// ⚖️ [DAMPING]: Adjusted to 0.5/0.5 to filter out computation jitter
+								fuzzCycles = int(float64(fuzzCycles)*0.5 + float64(newTargetCycles)*0.5)
+
+								if fuzzCycles < 100 {
+									fuzzCycles = 100
+								}
+							}
+						}
+						log.Printf("%s background took: %v (target: %v) cycles: %d",
+							statusIcon, took, targetDuration, fuzzCycles)
+					}()
+					b.internalTests(appCtx, fuzzCycles)
+					// do things to keep the 2 halves of the brain "fresh" here while the application is idle
+					// * allow them to "speak" to eachother with a slow rate (hourly?)
+					// * allow them to "ruminate" on old prompts that are resolved but high interest (entropy values?)
+					// Perform a bounded burst of fuzzing during 'Idle' time
+					// This uses the same logic as the CI check-in
+				}()
 			case q := <-b.queries:
 				func(appCtx context.Context, q Query) {
 					log.Printf("received query %#v", q)

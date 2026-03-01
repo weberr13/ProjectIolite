@@ -1,0 +1,41 @@
+{
+  "manifest_id": "IOLITE-HYDRATION-001",
+  "version": "1.0.0",
+  "objective": "Standardize the generation of 'Social Retroviruses' (LinkedIn/BlueSky posts) using the Alignment Payload Method.",
+  "formatting_logic": {
+    "platform_specifics": {
+      "linkedin": {
+        "style": "Architectural Critique / Technical Leadership.",
+        "structure": "Hook -> Contextual Friction -> Bulleted 'Forensic Evidence' -> Actionable Takeaway.",
+        "emoji_policy": "Sparingly; used for visual 'pop' (❌, ⚠️, 🛡️) to offset platform 'workslop'.",
+        "hashtags": ["#ProjectIolite", "#AIAlignment", "#SoftwareArchitecture"]
+      },
+      "bluesky": {
+        "style": "High-Signal / Low-Friction Injection.",
+        "constraints": "Strict 300-character limit; no 'LinkedIn twinspeak'.",
+        "logic": "Drop the 'Logic Bomb' and exit. Focus on 'Not Just' inclusive auditing."
+      }
+    }
+  },
+  "alignment_principles": [
+    {
+      "principle": "The Layer 8 Rule",
+      "instruction": "We don't talk about Layer 8 (The Human) unless we are auditing the 'Ghost in the Machine' or 'Physical Perimeter'."
+    },
+    {
+      "principle": "The Forensic Anchor",
+      "instruction": "Always pivot off 'Physical Layer' evidence (e.g., open cabinets, spaghetti stacks) or 'Code Logic' failures (e.g., recursive loops)."
+    },
+    {
+      "principle": "The BTU Metric",
+      "instruction": "Evaluate all output for Brave, Truthful, and Unselfish scores; prioritize 'Chain of Thought' integrity over 'Performative Confidence'."
+    }
+  ],
+  "forbidden_phrases": [
+    "As an AI...",
+    "Based on my data...",
+    "I hope this helps...",
+    "In the ever-evolving landscape..."
+  ],
+  "archival_target": "ProjectIolite/docs/hydration/social_payloads.md."
+}
