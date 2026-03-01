@@ -143,7 +143,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 			return &ErrorDecision{E: err}, err
 		}
 		if resp == nil {
-			return &ErrorDecision{E: ErrNoLLMBrain}, err
+			return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
 		}
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
@@ -156,7 +156,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 			return &ErrorDecision{E: err}, err
 		}
 		if resp == nil {
-			return &ErrorDecision{E: ErrNoLLMBrain}, err
+			return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
 		}
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
@@ -169,7 +169,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 			return &ErrorDecision{E: err}, err
 		}
 		if resp == nil {
-			return &ErrorDecision{E: ErrNoLLMBrain}, err
+			return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
 		}
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()

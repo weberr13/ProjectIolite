@@ -43,17 +43,35 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 			// Use the app context or request context
 			decision, err := backend.Push(r.Context(), req.Prompt)
 			if err != nil {
+				log.Printf("got decision : %#v", decision)
 				// Handle the singularity
 				if err.Error() == "singularity" {
 					w.WriteHeader(http.StatusTeapot)
 					json.NewEncoder(w).Encode(map[string]any{"manifesto": "The Piston has evolved."})
 					return
 				}
-				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				switch decision.IsError() {
+				case brain.ErrNoConsensus:
+					w.WriteHeader(http.StatusConflict)
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(decision)
+					return
+				default:
+					http.Error(w, decision.IsError().Error(), http.StatusInternalServerError)
+				}
 				return
 			}
 			if decision.IsError() != nil {
-				http.Error(w, decision.IsError().Error(), http.StatusInternalServerError)
+				log.Printf("got decision : %#v", decision)
+				switch decision.IsError() {
+				case brain.ErrNoConsensus:
+					w.WriteHeader(http.StatusConflict)
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(decision)
+					return
+				default:
+					http.Error(w, decision.IsError().Error(), http.StatusInternalServerError)
+				}
 				return
 			}
 

@@ -3,7 +3,6 @@ package brain
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"regexp"
 	"strings"
 )
@@ -18,74 +17,96 @@ type HasTexts interface {
 }
 
 func (p *DecisionParser) IsApproved(sv SignVerifier, dec HasTexts) (bool, error) {
-	if sv == nil {
-		return false, ErrNoConsensus
-	}
 	texts := dec.Texts()
 
-	// TODO: once the prompt signs the text chain find the prompt with PrevSignature == "" and use it
-	PromptSignature := ""
+	// 1. Build the Braid Map: Signature -> Block
+	// And track which Signatures are 'pointed to' by others.
+	allBlocks := make(map[string]Signed)
+	hasParent := make(map[string]bool)
 
-	// 1. Flatten all blocks into a map for O(1) lookups by PrevSignature
-	chainMap := make(map[string]Signed)
-	var genesis Signed
-	for _, txs := range texts {
-		for _, tx := range txs {
-			if tx.PrevSignature == PromptSignature {
-				genesis = tx
-			}
-			chainMap[tx.PrevSignature] = tx
+	for _, turns := range texts {
+		for _, turn := range turns {
+			allBlocks[turn.Signature] = turn
+			hasParent[turn.PrevSignature] = true
 		}
 	}
 
-	// 2. Walk the braid from Genesis
-	current := genesis
-	found := false
-	lastDecision := false
+	// 2. Identify the 'Terminal Node'
+	// The winner is the block that has an opinion AND is not a 'PrevSignature' for anyone else.
+	var terminal Signed
+	foundTerminal := false
+
+	for sig, block := range allBlocks {
+		if !hasParent[sig] {
+			// This is a leaf node (nothing points to it)
+			terminal = block
+			foundTerminal = true
+			break
+		}
+	}
+
+	if !foundTerminal {
+		return false, ErrNoConsensus
+	}
+
+	// 3. Walk BACKWARDS from the Terminal Node to verify the chain and find the latest opinion
+	current := terminal
+	foundOpinion := false
+	verdict := false
 
 	for {
-		// Verify integrity at every step of the walk
+		// Mandatory Integrity Check
 		if err := current.Verify(sv); err != nil {
 			return false, err
 		}
 
-		// 1. ALL-OR-NOTHING DECODING:
-		// We attempt to decode the entire Data field.
-		// If it's not B64, we treat it as raw (for transition/legacy).
-		payload := current.Data
-		if decoded, err := base64.StdEncoding.DecodeString(current.Data); err == nil {
-			payload = string(decoded)
-		}
+		// Extract Opinion if we haven't found the 'Latest' one yet
+		// Since we are walking BACKWARDS, the first opinion we find
+		// is technically the 'Last' one in the causal chain.
+		if !foundOpinion {
+			payload := current.Data
+			if decoded, err := base64.StdEncoding.DecodeString(current.Data); err == nil {
+				payload = string(decoded)
+			}
 
-		// Parse JSON from the current block
-		jsons := parseForJsonBlocks(payload)
-		for _, b := range jsons {
-			var m map[string]any
-			if err := json.Unmarshal(b, &m); err == nil {
+			jsons := parseForJsonBlocks(payload)
+			for i := len(jsons) - 1; i >= 0; i-- {
+				var m map[string]any
+				if err := json.Unmarshal(jsons[i], &m); err != nil {
+					continue // Skip unparseable JSON
+				}
+
+				// Type-safe extraction of the decision
 				val, ok := m["accepted"].(bool)
 				if !ok {
 					val, ok = m["approved"].(bool)
 				}
+
 				if ok {
-					found = true
-					lastDecision = val // Overwrite: The "Last Authoritative" rule
+					// We found a valid boolean opinion!
+					// Since we are walking backwards from the Terminal Leaf,
+					// the first valid bool we find is the "Global Winner."
+					if !foundOpinion {
+						verdict = val
+						foundOpinion = true
+					}
 				}
 			}
 		}
 
-		// Look for the next link in the chain
-		next, ok := chainMap[current.Signature]
+		// Move up the chain
+		next, ok := allBlocks[current.PrevSignature]
 		if !ok {
-			break // End of the braid
+			break // Reached the Genesis Anchor
 		}
 		current = next
 	}
 
-	if !found {
-		return false, errors.New("no terminal decision found in braid")
+	if !foundOpinion {
+		return false, ErrNoConsensus
 	}
 
-	return lastDecision, nil
+	return verdict, nil
 }
 
 func parseForJsonBlocks(data string) [][]byte {

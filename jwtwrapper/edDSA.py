@@ -28,9 +28,14 @@ def verify_iolite_block(public_key_b64, data_b64, signature_b64, prev_sig_b64=""
         if len(sig_bytes) != 64 or len(pk_bytes) != 32:
             return {"verified": False, "error": "sig_len"}
 
-        # Binary message reconstruction
-        m1 = robust_decode(data_b64) if data_b64 else b""
-        m2 = robust_decode(prev_sig_b64) if prev_sig_b64 else b""
+        # # Binary message reconstruction
+        # m1 = robust_decode(data_b64) if data_b64 else b""
+        # m2 = robust_decode(prev_sig_b64) if prev_sig_b64 else b""
+
+        # FIX: Reconstruct message using literal string bytes
+        # This matches Go's `b64Data + s.PrevSignature`
+        m1 = data_b64.encode('utf-8') if data_b64 else b""
+        m2 = prev_sig_b64.encode('utf-8') if prev_sig_b64 else b""
         message = m1 + m2
 
         inv = lambda x: pow(x, P_CURVE - 2, P_CURVE)
@@ -134,7 +139,9 @@ def verify_iolite_block(public_key_b64, data_b64, signature_b64, prev_sig_b64=""
         rhs = edwards_add(R, scalarmult(A, h_reduced))
         
         if scmult == rhs:
-            return {"verified": True, "payload_decrypted": m1.decode('utf-8') if m1 else ""}
+            # We still decode for the BTU return, but NOT for the signature check
+            actual_payload = base64.b64decode(data_b64).decode('utf-8')
+            return {"verified": True, "payload_decrypted": actual_payload}
         
         return {
             "verified": False, 

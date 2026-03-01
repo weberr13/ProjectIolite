@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/weberr13/ProjectIolite/brain"
 	"google.golang.org/genai"
 )
@@ -258,6 +259,7 @@ func TestGeminiResponse_Cryptography(t *testing.T) {
 func TestGeminiResponse_Describe(t *testing.T) {
 	t.Run("Describe: Verify Manifest Formatting and B64 Encoding", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
+		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockSV.On("ExportPublicKey").Return("iolite_pk_test_001")
 		mockSV.On("Alg").Return("Ed25519")
 

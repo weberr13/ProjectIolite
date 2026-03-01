@@ -15,6 +15,9 @@ import (
 //go:embed exampleDecision4.json
 var decision4 string
 
+//go:embed exampleDecision5.json
+var decision5 string
+
 type FakeDecision struct {
 	ChainOfThoughts map[string][][]Signed
 	AllPrompts      map[string][]Signed
@@ -35,6 +38,32 @@ func TestDecisionParser_IsApproved_Example4(t *testing.T) {
 	// Note: You may need to adapt this to your specific 'WholeDecision' struct
 	var dec FakeDecision
 	err := json.Unmarshal([]byte(decision4), &dec)
+	require.NoError(t, err, "Failed to unmarshal exampleDecision4.json")
+
+	// 3. Execute the public method
+	// This will internally call parseForJsonBlocks on the 'claude' source (since it has sourceSig == "")
+	approved, err := parser.IsApproved(mockSV, &dec)
+
+	// 4. Assertions
+	t.Run("BTU Consensus Result", func(t *testing.T) {
+		assert.NoError(t, err)
+		// Based on exampleDecision4.json, Claude outputs {"approved": true} at the end.
+		// Note: The example uses "approved", while the parser looks for "accepted".
+		// I will provide a fix for this discrepancy in the logic check below.
+		assert.True(t, approved, "The parser should find the approved/accepted terminal state")
+	})
+}
+
+func TestDecisionParser_IsApproved_Example5(t *testing.T) {
+	// 1. Setup Parser and Mock Verifier
+	parser := &DecisionParser{}
+	mockSV := new(MockSignVerifier)
+
+	mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+	// 2. Unmarshal example data into a concrete Decision implementation
+	// Note: You may need to adapt this to your specific 'WholeDecision' struct
+	var dec FakeDecision
+	err := json.Unmarshal([]byte(decision5), &dec)
 	require.NoError(t, err, "Failed to unmarshal exampleDecision4.json")
 
 	// 3. Execute the public method
@@ -161,8 +190,7 @@ func TestDecisionParser_BraidChain(t *testing.T) {
 		}
 
 		approved, err := parser.IsApproved(mockSV, dec)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "no terminal decision found")
+		assert.Equal(t, err, ErrNoConsensus)
 		assert.False(t, approved)
 	})
 }
@@ -195,5 +223,27 @@ func TestDecisionParser_GlobalBase64(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, approved, "Should decode the entire envelope and find the JSON within")
+	})
+}
+
+func TestDecisionParser_LoosenedRegex(t *testing.T) {
+	parser := &DecisionParser{}
+	mockSV := new(MockSignVerifier)
+	mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil)
+
+	t.Run("Condensed_JSON_Block", func(t *testing.T) {
+		// Minimum message with no newlines, as requested
+		condensedData := "Verdict:```json{\"approved\": true}```"
+
+		dec := &FakeDecision{
+			AllTexts: map[string][]Signed{
+				"gemini": {{Data: "source", Signature: "sig1", PrevSignature: ""}},
+				"claude": {{Data: condensedData, Signature: "sig2", PrevSignature: "sig1"}},
+			},
+		}
+
+		approved, err := parser.IsApproved(mockSV, dec)
+		assert.NoError(t, err)
+		assert.True(t, approved, "The loosened regex should capture JSON even without newlines")
 	})
 }
