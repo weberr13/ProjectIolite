@@ -907,10 +907,10 @@ func TestClaudeDecision_AddSignFailure(t *testing.T) {
 	})
 }
 
-func TestErorrSetting(t *testing.T) {
-	t.Run("can get and set errors", func(t *testing.T){
+func TestErrorSetting(t *testing.T) {
+	t.Run("can get and set errors", func(t *testing.T) {
 		d := &BaseDecision{}
-		assert.NoError(t,d.IsError())
+		assert.NoError(t, d.IsError())
 		err := errors.New("this is expected")
 		d.SetError(err)
 		assert.Equal(t, err, d.IsError())

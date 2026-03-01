@@ -48,6 +48,10 @@ func (e *ErrorResponse) IsError() error {
 	return e.E
 }
 
+func (e *ErrorResponse) SetError(err error) {
+	e.E = err
+}
+
 type ErrorDecision struct {
 	E error
 }

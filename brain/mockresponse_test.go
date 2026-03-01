@@ -41,3 +41,6 @@ func (m *MockResponse) IsError() error {
 	args := m.Called()
 	return args.Error(0)
 }
+
+func (m *MockResponse) SetError(err error) {
+}

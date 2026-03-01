@@ -72,3 +72,7 @@ func (e *GeminiError) Unwrap() error {
 func (e *GeminiError) IsError() error {
 	return e.e
 }
+
+func (e *GeminiError) SetError(err error) {
+	e.e = err
+}
