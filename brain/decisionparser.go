@@ -94,7 +94,7 @@ func (p *DecisionParser) IsApproved(sv SignVerifier, dec HasTexts) (bool, error)
 	return verdict, nil
 }
 
-func parseForJsonBlocks(data string) []Audit {
+func parseForJsonBlocks(data string, passthroughMatches ...bool) []Audit {
 	var allAudits []Audit
 	matches := AuditRegex.FindAllStringSubmatch(data, -1)
 
@@ -103,17 +103,22 @@ func parseForJsonBlocks(data string) []Audit {
 
 		// Try raw JSON first - this is the BTU 'Truthful' approach
 		if json.Valid([]byte(rawContent)) {
-			a := Audit{}
+			a := Audit{
+				Raw: rawContent,
+			}
 			err := json.Unmarshal([]byte(rawContent), &a)
 			if err != nil {
 				log.Printf("could not parse audit %s: %s", rawContent, err)
 				continue
 			}
-			err = a.Validate()
-			if err != nil {
-				log.Printf("could not validate audit %s: %s", rawContent, err)
-				continue
+			if len(passthroughMatches) == 0 || !passthroughMatches[0] {
+				err = a.Validate()
+				if err != nil {
+					log.Printf("could not validate audit %s: %s", rawContent, err)
+					continue
+				}
 			}
+
 			allAudits = append(allAudits, a)
 			continue
 		}

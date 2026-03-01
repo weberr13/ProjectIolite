@@ -222,6 +222,12 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 				// do things to keep the 2 halves of the brain "fresh" here while the application is idle
 				// * allow them to "speak" to eachother with a slow rate (hourly?)
 				// * allow them to "ruminate" on old prompts that are resolved but high interest (entropy values?)
+				// Perform a bounded burst of fuzzing during 'Idle' time
+				// This uses the same logic as the CI check-in
+				err := AuditFuzzCycle(appCtx, 50)
+				if err != nil {
+					panic(err)
+				}
 			case q := <-b.queries:
 				func(appCtx context.Context, q Query) {
 					log.Printf("received query %#v", q)
