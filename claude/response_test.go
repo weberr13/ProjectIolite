@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -10,6 +11,11 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 )
+
+// Helper for cryptographic grounding
+func b64(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
+}
 
 func TestClaudeResponse_Verify_DeepCoverage(t *testing.T) {
 	mockSV := new(MockSignVerifier)
