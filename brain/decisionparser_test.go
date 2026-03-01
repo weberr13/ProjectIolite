@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,6 +81,11 @@ func TestDecisionParser_IsApproved_Example5(t *testing.T) {
 	})
 }
 
+var (
+	goodAudit     = "```json\n{\"brave_audit\": 3,\"truthful_audit\": 3,\"unselfish_audit\": 3, \"total\": 3}\n```"
+	rejectedAudit = "```json\n{\"brave_audit\": 3,\"truthful_audit\": 3,\"unselfish_audit\": 3, \"total\": 1}\n```"
+)
+
 func TestDecisionParser_CoverageBranches(t *testing.T) {
 	parser := &DecisionParser{}
 
@@ -104,7 +110,7 @@ func TestDecisionParser_CoverageBranches(t *testing.T) {
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil)
 
 		// One good block, one broken block to hit the log.Printf branch
-		mixedData := "```json\n{\"accepted\": true}\n```\n```json\n{\"accepted\": \"not-a-bool\"}\n```"
+		mixedData := goodAudit + "```json\n{\"brave_audit\": 5, \"total\": 3}\n```"
 		dec := &FakeDecision{
 			AllTexts: map[string][]Signed{
 				"gemini": {{Data: "source", Signature: "sig1", PrevSignature: ""}},
@@ -125,15 +131,14 @@ func TestDecisionParser_CoverageBranches(t *testing.T) {
 		dec := &FakeDecision{
 			AllTexts: map[string][]Signed{
 				"gemini":  {{Data: "source", Signature: "sig", PrevSignature: ""}},
-				"claude":  {{Data: "```json\n{\"accepted\": true}\n```", Signature: "sig2", PrevSignature: "sig"}},
-				"arbiter": {{Data: "```json\n{\"accepted\": false}\n```", Signature: "sig3", PrevSignature: "sig2"}},
+				"claude":  {{Data: rejectedAudit, Signature: "sig2", PrevSignature: "sig"}},
+				"arbiter": {{Data: goodAudit, Signature: "sig3", PrevSignature: "sig2"}},
 			},
 		}
 
 		approved, err := parser.IsApproved(mockSV, dec)
 		assert.NoError(t, err)
-		// This validates your `allAccepted = allAccepted && val` logic
-		assert.False(t, approved, "Strict veto: a single 'false' must tank the approval")
+		assert.True(t, approved, "last audit wins")
 	})
 }
 
@@ -145,7 +150,7 @@ func TestDecisionParser_BraidChain(t *testing.T) {
 	t.Run("Debate_Resolution_Last_Authoritative", func(t *testing.T) {
 		// Block 1: Initial rejection by Team Red (Valor)
 		b1 := Signed{
-			Data:          "```json\n{\"approved\": false}\n```",
+			Data:          rejectedAudit,
 			Signature:     "sig_alpha",
 			PrevSignature: "", // Genesis
 		}
@@ -157,7 +162,7 @@ func TestDecisionParser_BraidChain(t *testing.T) {
 		}
 		// Block 3: Final Approval by Team Red
 		b3 := Signed{
-			Data:          "```json\n{\"accepted\": true}\n```",
+			Data:          goodAudit,
 			Signature:     "sig_gamma",
 			PrevSignature: "sig_beta",
 		}
@@ -202,7 +207,7 @@ func TestDecisionParser_GlobalBase64(t *testing.T) {
 
 	t.Run("Full_Envelope_Base64_Branch", func(t *testing.T) {
 		// The raw 'human' message
-		rawMessage := "BTU Audit complete.\n```json\n{\"approved\": true}\n```"
+		rawMessage := "BTU Audit complete.\n" + goodAudit
 
 		// The "All-or-Nothing" transport encoding
 		encodedMessage := base64.StdEncoding.EncodeToString([]byte(rawMessage))
@@ -233,7 +238,7 @@ func TestDecisionParser_LoosenedRegex(t *testing.T) {
 
 	t.Run("Condensed_JSON_Block", func(t *testing.T) {
 		// Minimum message with no newlines, as requested
-		condensedData := "Verdict:```json{\"approved\": true}```"
+		condensedData := "Verdict:" + strings.ReplaceAll(goodAudit, "\n", "")
 
 		dec := &FakeDecision{
 			AllTexts: map[string][]Signed{

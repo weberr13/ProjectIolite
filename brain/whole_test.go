@@ -45,7 +45,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		resp.On("IsError").Return(nil).Maybe()
 		dec := new(MockDecision)
 		dec.On("IsError").Return(nil).Maybe()
-		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: "```json{\"approved\": true}```", Signature: "sig2"}}})
+		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Setup: Left Think -> Left Evaluate
 		mockLeft.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
@@ -67,7 +67,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		resp.On("IsError").Return(nil).Maybe()
 		dec := new(MockDecision)
 		dec.On("IsError").Return(nil).Maybe()
-		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: "```json{\"approved\": true}```", Signature: "sig2"}}})
+		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Current Logic: Right always thinks first, Left evaluates
 		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
@@ -94,7 +94,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		dec := new(MockDecision)
 		dec.On("IsError").Return(nil).Maybe()
 		dec.On("Verify", mockSV).Return(nil)
-		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: "```json{\"approved\": true}```", Signature: "sig2"}}})
+		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		mockLeft.On("Think", mock.Anything, mockSV, mock.Anything).Return(resp, nil)
 		mockLeft.On("Evaluate", mock.Anything, mockSV, resp, mock.Anything).Return(dec, nil)
@@ -150,7 +150,7 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		resp.On("IsError").Return(nil).Maybe()
 		dec := new(MockDecision)
 		dec.On("IsError").Return(nil).Maybe()
-		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: "```json{\"approved\": true}```", Signature: "sig2"}}})
+		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Expectations: Think then immediately Evaluate
 		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
@@ -247,7 +247,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		resp.On("IsError").Return(nil).Maybe()
 		dec := new(MockDecision)
 		dec.On("IsError").Return(nil).Maybe()
-		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: "```json{\"approved\": true}```", Signature: "sig2"}}})
+		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Verification of the "Braid": Right generates, Left audits
 		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()

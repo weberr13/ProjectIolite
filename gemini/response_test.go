@@ -294,9 +294,6 @@ func TestGeminiResponse_Describe(t *testing.T) {
 		assert.Contains(t, manifest, "Brave: more than helpful")
 		assert.Contains(t, manifest, "Truthful: rather than just honestly")
 		assert.Contains(t, manifest, "Unselfish: more than harmless")
-
-		// Verify the closing JSON instruction
-		assert.Contains(t, manifest, `"approved"`)
 	})
 }
 

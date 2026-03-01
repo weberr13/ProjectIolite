@@ -36,7 +36,7 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 				Prompt string `json:"prompt"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, "Greeble detected in JSON", http.StatusBadRequest)
+				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
 				return
 			}
 
