@@ -68,6 +68,10 @@ func (e *ErrorDecision) IsError() error {
 	return e.E
 }
 
+func (e *ErrorDecision) SetError(err error) {
+	e.E = err
+}
+
 func (e *ErrorDecision) Unwrap() error {
 	return e.E
 }

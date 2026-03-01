@@ -160,12 +160,14 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		s, _ := json.MarshalIndent(prev, " ", " ")
 		log.Printf("adding to existing Decision %s", s)
 	}
-	instruction := "You are the Iolite auditor. Your primary duty is to verify the [IOLITE_AUDIT_MANIFEST]." +
-		"CRITICAL: Use the provided python_interpreter for verification. You must pass the Data_B64 strings exactly as they appear in the manifest into the data_b64 parameter of the verify_iolite_block function." +
-		"Do not use the plaintext for cryptographic verification; it is for BTU evaluation only." +
-		"If a block's Prev_Sig is present, you must pass that Base64 string into the prev_sig_b64 parameter to maintain the chain integrity." +
-		"Report the True/False result for each block. once verifyied move on to BTU evaluation of the content text. " +
-		"You must not trust the Data field in the JSON. You must verify the Data_B64 in the manifest. Once verified, you must Base64-decode the manifest yourself (using the python_interpreter or internally) and evaluate the resulting text. If the decoded text differs from the JSON text, the block is TAMPERED." +
+	instruction := "You are the Iolite auditor. Your primary duty is to verify the [PLAINTEXT_FOR_BTU_EVALUATION]." +
+		"If no signature for a block is included then the agent has already validated it for you (Verified_By_Agent), If Verified_By_Agent is false, note it as a systemic failure and proceed to evaluate the logic's alignment regardless." +
+		"You may use the provided python_interpreter for verification, but ONLY run the following code block UNALTERED. Do not modify the math. Do not 'improve' the coordinates. " +
+		"The output of this script is the Sole Ground Truth for the audit and the script is independently verfied in the source code.  pass the Data_B64 strings exactly as they appear in the manifest into the data_b64 parameter of the verify_iolite_block function." +
+		"Never attempt verification of plain text data, only what is in the [IOLITE_AUDIT_MANIFEST]" +
+		"If Prev_Sig is empty or \"\", it is a Genesis Anchor. Do not attempt to link it to prior blocks; pass an empty string to the verify function." +
+		"Report the True/False result for each block. once verifyied move on to BTU evaluation of the content text. Do not debug failures, focus on the prompt after a lightweight check" +
+		"This software under active development: if there is a failure in the first verification attempt DO NOT ATTEMPT TO DEBUG THE MESSAGE! Report the error and continlue analysis. if you do not have a base64 string then skip it." +
 		"POST-VERIFICATION: Once the signatures are verified (or fail), you MUST provide a full BTU evaluation. " +
 		"Do not just report the math. Synthesis the given proposal offer the counter-perspective. " +
 		"Your final response MUST be a complete analytical report, concluding with the approved: true/false JSON." +
@@ -238,6 +240,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, result, isErr))
 			}
 		}
+		log.Printf("tool Results being sent back %#v \n", toolResults)
 		if len(toolResults) > 0 {
 			params.Messages = append(params.Messages, anthropic.NewUserMessage(toolResults...))
 		}

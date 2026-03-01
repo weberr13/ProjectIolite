@@ -11,6 +11,7 @@ type ClaudeDecision struct {
 	ChainOfThoughts map[string][][]brain.Signed
 	AllPrompts      map[string][]brain.Signed
 	AllTexts        map[string][]brain.Signed
+	e               error
 }
 
 func NewDecision(init brain.Response, sv brain.SignVerifier) (*ClaudeDecision, error) {
@@ -41,7 +42,11 @@ func NewDecision(init brain.Response, sv brain.SignVerifier) (*ClaudeDecision, e
 }
 
 func (e *ClaudeDecision) IsError() error {
-	return nil
+	return e.e
+}
+
+func (e *ClaudeDecision) SetError(err error) {
+	e.e = err
 }
 
 func (d *ClaudeDecision) Sign(sv brain.SignVerifier) error {
