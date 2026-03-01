@@ -76,7 +76,11 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		return &ClaudeError{e: err}, err
 	}
 
-	resp := &ClaudeResponse{resp: message, prompt: prompt, model: string(message.Model)}
+	b := brain.NewBaseResponse("claude", prompt)
+	resp := &ClaudeResponse{
+		BaseResponse: b,
+		resp:         message, model: string(message.Model),
+	}
 	err = resp.Sign(sv)
 	return resp, err
 }

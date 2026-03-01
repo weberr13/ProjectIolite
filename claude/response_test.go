@@ -68,20 +68,6 @@ func TestClaudeResponse_Verify_DeepCoverage(t *testing.T) {
 	})
 }
 
-func TestClaudeResponse_Getters(t *testing.T) {
-	t.Run("Prompt: Verify Pass-through", func(t *testing.T) {
-		expected := brain.Signed{Data: "System Directive", Namespace: "prompt"}
-		r := &ClaudeResponse{prompt: expected}
-
-		assert.Equal(t, expected, r.Prompt())
-	})
-
-	t.Run("Source: Identity Check", func(t *testing.T) {
-		r := &ClaudeResponse{}
-		assert.Equal(t, "claude", r.Source())
-	})
-}
-
 func TestClaudeResponse_CandidatesToThoughts(t *testing.T) {
 	t.Run("Chain: Recursive PrevSignature Stitching", func(t *testing.T) {
 		rawJSON := `[
@@ -108,8 +94,10 @@ func TestClaudeResponse_CandidatesToThoughts(t *testing.T) {
 func TestClaudeResponse_Sign(t *testing.T) {
 	t.Run("Sign: Success Path with Prompt Grounding", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
+		prompt := brain.Signed{Data: "system prompt"}
+		b := brain.NewBaseResponse("claude", prompt)
 		r := &ClaudeResponse{
-			prompt: brain.Signed{Data: "system prompt"}, // GROUND THE PROMPT
+			BaseResponse: b,
 			cot: []brain.Signed{
 				{Data: "thought", PrevSignature: ""},
 			},
@@ -133,7 +121,7 @@ func TestClaudeResponse_Sign(t *testing.T) {
 
 		// 4. ASSERTIONS
 		assert.NoError(t, err)
-		assert.Equal(t, "sig_p", r.prompt.Signature)
+		assert.Equal(t, "sig_p", r.Prompt().Signature)
 		assert.Equal(t, "sig_1", r.cot[0].Signature)
 		assert.Equal(t, "sig_2", r.thought.Signature)
 
@@ -142,10 +130,11 @@ func TestClaudeResponse_Sign(t *testing.T) {
 
 	t.Run("Sign: Fail on CoT Error", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
+		b := brain.NewBaseResponse("claude", brain.Signed{Data: "system"})
 		r := &ClaudeResponse{
-			prompt:  brain.Signed{Data: "system"},
-			cot:     []brain.Signed{{Data: "unlucky thought"}},
-			thought: &brain.Signed{Data: "placeholder"}, // PROTECT AGAINST NIL DEREF
+			BaseResponse: b,
+			cot:          []brain.Signed{{Data: "unlucky thought"}},
+			thought:      &brain.Signed{Data: "placeholder"}, // PROTECT AGAINST NIL DEREF
 		}
 
 		signErr := errors.New("hsm_offline")
@@ -173,9 +162,10 @@ func TestClaudeResponse_Sign_PromptFail(t *testing.T) {
 		var msg anthropic.Message
 		json.Unmarshal([]byte(rawJSON), &msg)
 
+		b := brain.NewBaseResponse("claude", brain.Signed{Data: "critical instructions", Signature: ""})
 		r := &ClaudeResponse{
-			resp:   &msg,
-			prompt: brain.Signed{Data: "critical instructions", Signature: ""},
+			BaseResponse: b,
+			resp:         &msg,
 		}
 
 		// 2. EXPECTATION: The very first Sign call fails

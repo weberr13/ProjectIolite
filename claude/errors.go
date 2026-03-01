@@ -70,3 +70,7 @@ func (e *ClaudeError) Unwrap() error {
 func (e *ClaudeError) IsError() error {
 	return e.e
 }
+
+func (e *ClaudeError) SetError(err error) {
+	e.e = err
+}

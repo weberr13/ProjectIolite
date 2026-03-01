@@ -50,6 +50,7 @@ type Response interface {
 	Verify(SignVerifier) error
 	Source() string
 	IsError() error
+	SetError(error)
 }
 
 type Decision interface {

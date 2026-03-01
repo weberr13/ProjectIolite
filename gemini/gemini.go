@@ -102,7 +102,8 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		return &GeminiError{e: err}, err
 	}
 
-	resp := &GeminiResponse{resp: result, model: g.model, prompt: prompt}
+	b := brain.NewBaseResponse("gemini", prompt)
+	resp := &GeminiResponse{resp: result, model: g.model, BaseResponse: b}
 	err = resp.Sign(sv)
 	return resp, err
 }

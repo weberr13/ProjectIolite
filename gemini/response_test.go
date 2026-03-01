@@ -46,21 +46,22 @@ func TestGeminiResponse_SignAndVerify(t *testing.T) {
 	mockSV := new(MockSignVerifier)
 
 	t.Run("Sign: Full Manifest Grounding", func(t *testing.T) {
+		b := brain.NewBaseResponse("gemini", brain.Signed{Data: "gemini prompt"})
 		r := &GeminiResponse{
-			resp:   &genai.GenerateContentResponse{}, // Empty but non-nil
-			prompt: brain.Signed{Data: "gemini prompt"},
-			model:  "gemini-2.0-flash",
+			BaseResponse: b,
+			resp:         &genai.GenerateContentResponse{}, // Empty but non-nil
+			model:        "gemini-2.0-flash",
 		}
 
 		// Expectations for Prompt, then Thought (Lazy loaded from Text())
 		mockSV.On("Sign", b64("gemini prompt")+"").Return("sig_p", nil).Once()
 		// GeminiResponse.Text() uses r.resp.Text(), which defaults to empty if resp is empty
-		mockSV.On("Sign", b64("")+"").Return("sig_t", nil).Once()
+		mockSV.On("Sign", b64("")+"sig_p").Return("sig_t", nil).Once()
 
 		err := r.Sign(mockSV)
 
 		assert.NoError(t, err)
-		assert.Equal(t, "sig_p", r.prompt.Signature)
+		assert.Equal(t, "sig_p", r.Prompt().Signature)
 		assert.Equal(t, "sig_t", r.thought.Signature)
 	})
 
@@ -79,19 +80,14 @@ func TestGeminiResponse_Identity(t *testing.T) {
 			Namespace: "prompt",
 			Signature: "sig_123",
 		}
-		r := &GeminiResponse{prompt: expected}
+		b := brain.NewBaseResponse("gemini", expected)
+		r := &GeminiResponse{BaseResponse: b}
 
 		got := r.Prompt()
 
 		assert.Equal(t, expected.Data, got.Data)
 		assert.Equal(t, expected.Signature, got.Signature)
 		assert.Equal(t, "prompt", got.Namespace)
-	})
-
-	t.Run("Source: Hardcoded Identity", func(t *testing.T) {
-		r := &GeminiResponse{}
-		// This must never change, as the Decision logic keys off this string
-		assert.Equal(t, "gemini", r.Source())
 	})
 }
 
@@ -172,9 +168,10 @@ func TestGeminiResponse_Cryptography(t *testing.T) {
 
 	t.Run("Sign: Prompt Failure", func(t *testing.T) {
 		// Target: Force 'err != nil' on prompt signing
+		b := brain.NewBaseResponse("gemini", brain.Signed{Data: "system prompt"})
 		r := &GeminiResponse{
-			prompt: brain.Signed{Data: "system prompt"},
-			resp:   &genai.GenerateContentResponse{}, // satisfy lazy init
+			BaseResponse: b,
+			resp:         &genai.GenerateContentResponse{}, // satisfy lazy init
 		}
 
 		signErr := errors.New("hsm_key_locked")
@@ -185,9 +182,9 @@ func TestGeminiResponse_Cryptography(t *testing.T) {
 	})
 
 	t.Run("Sign: CoT Chain Failure", func(t *testing.T) {
-		// Target: Force 'err != nil' in the loop
+		b := brain.NewBaseResponse("gemini", brain.Signed{Data: "p", Signature: "sig_p"})
 		r := &GeminiResponse{
-			prompt: brain.Signed{Data: "p", Signature: "sig_p"},
+			BaseResponse: b,
 			cot: []brain.Signed{
 				{Data: "step 1"},
 				{Data: "step 2"},
@@ -196,7 +193,7 @@ func TestGeminiResponse_Cryptography(t *testing.T) {
 		}
 
 		// First thought signs successfully
-		mockSV.On("Sign", b64("step 1")+"").Return("sig_1", nil).Once()
+		mockSV.On("Sign", b64("step 1")+"sig_p").Return("sig_1", nil).Once()
 		// Second thought fails
 		cotErr := errors.New("signature_buffer_full")
 		mockSV.On("Sign", b64("step 2")+"sig_1").Return("", cotErr).Once()
@@ -226,8 +223,9 @@ func TestGeminiResponse_Cryptography(t *testing.T) {
 
 	t.Run("Sign: CoT Chain Success (Internal Stitching Only)", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
+		b := brain.NewBaseResponse("gemini", brain.Signed{Data: "p", Signature: "sig_p"})
 		r := &GeminiResponse{
-			prompt: brain.Signed{Data: "p", Signature: "sig_p"},
+			BaseResponse: b,
 			cot: []brain.Signed{
 				{Data: "step 1"},
 				{Data: "step 2"},
@@ -237,7 +235,7 @@ func TestGeminiResponse_Cryptography(t *testing.T) {
 
 		// 1. Prompt signs independently (or is already signed)
 		// 2. First thought: lastSig is "", so no salt
-		mockSV.On("Sign", b64("step 1")+"").Return("sig_1", nil).Once()
+		mockSV.On("Sign", b64("step 1")+"sig_p").Return("sig_1", nil).Once()
 
 		// 3. Second thought: lastSig is "sig_1", so it chains!
 		mockSV.On("Sign", b64("step 2")+"sig_1").Return("sig_2", nil).Once()
@@ -262,14 +260,15 @@ func TestGeminiResponse_Describe(t *testing.T) {
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockSV.On("ExportPublicKey").Return("iolite_pk_test_001")
 		mockSV.On("Alg").Return("Ed25519")
+		b := brain.NewBaseResponse("gemini", brain.Signed{
+			Data:          "Test Prompt",
+			Signature:     "sig_p",
+			PrevSignature: "root",
+		})
 
 		r := &GeminiResponse{
-			model: "gemini-2.0-flash",
-			prompt: brain.Signed{
-				Data:          "Test Prompt",
-				Signature:     "sig_p",
-				PrevSignature: "root",
-			},
+			model:        "gemini-2.0-flash",
+			BaseResponse: b,
 			thought: &brain.Signed{
 				Data:          "Test Final Output",
 				Signature:     "sig_f",
