@@ -7,13 +7,36 @@ import (
 // MockResponse is now exported for use in gemini/claude tests
 type MockResponse struct{ mock.Mock }
 
-func (m *MockResponse) CoT() []Signed                   { return nil }
-func (m *MockResponse) Text() *Signed                   { return nil }
-func (m *MockResponse) Prompt() Signed                  { return Signed{} }
+func (m *MockResponse) CoT() []Signed {
+	args := m.Called()
+	return args.Get(0).([]Signed)
+}
+
+func (m *MockResponse) Text() *Signed {
+	args := m.Called()
+	return args.Get(0).(*Signed)
+}
+
+func (m *MockResponse) Prompt() Signed {
+	args := m.Called()
+	return args.Get(0).(Signed)
+}
 func (m *MockResponse) Describe(sv SignVerifier) string { return "" }
-func (m *MockResponse) Sign(sv SignVerifier) error      { return nil }
-func (m *MockResponse) Verify(sv SignVerifier) error    { return nil }
-func (m *MockResponse) Source() string                  { return "mock" }
+func (m *MockResponse) Sign(sv SignVerifier) error {
+	args := m.Called(sv)
+	return args.Error(0)
+}
+
+func (m *MockResponse) Verify(sv SignVerifier) error {
+	args := m.Called(sv)
+	return args.Error(0)
+}
+
+func (m *MockResponse) Source() string {
+	args := m.Called()
+	return args.String(0)
+}
+
 func (m *MockResponse) IsError() error {
 	args := m.Called()
 	return args.Error(0)

@@ -12,6 +12,11 @@ import (
 	"google.golang.org/genai"
 )
 
+// Helper for cryptographic grounding
+func b64(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
+}
+
 func TestGemini_Think_NoNil(t *testing.T) {
 	ctx := context.Background()
 	mockSV := new(MockSignVerifier)
@@ -384,7 +389,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		// 1. Peer Output Mocks
 		peerOutput.On("Text").Return(&brain.Signed{Signature: pTxtSig, Data: pTxt}).Maybe()
 		peerOutput.On("Describe", mock.Anything).Return("manifest_data").Once()
-		peerOutput.On("Verify", mockSV).Return(nil).Once()
+		peerOutput.On("Verify", mockSV).Return(nil).Twice()
 		peerOutput.On("Prompt").Return(brain.Signed{Signature: pPromptSig, Data: pPrompt}).Maybe()
 		peerOutput.On("Source").Return("gemini").Maybe()
 
@@ -437,7 +442,7 @@ func TestGemini_Evaluate_FinalBranches(t *testing.T) {
 			Return(&genai.GenerateContentResponse{}, nil).Once()
 		peerOutput.On("Describe", mock.Anything).Return("data").Once()
 		peerOutput.On("Text").Return(&brain.Signed{Signature: "", Data: "text"}).Maybe()
-		peerOutput.On("Verify", mockSV).Return(nil).Once()
+		peerOutput.On("Verify", mockSV).Return(nil).Twice()
 		peerOutput.On("Prompt").Return(brain.Signed{Signature: "", Data: "prompt"}).Maybe()
 		peerOutput.On("Source").Return("gemini").Maybe()
 		mockSV.On("Sign", mock.Anything).Return("text", nil).Maybe()
