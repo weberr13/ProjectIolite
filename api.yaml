@@ -26,36 +26,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Decision'
+              examples:
+                success_example:
+                  # 🛡️ [FORENSIC ANCHOR]: Use externalValue for direct file refs
+                  externalValue: '/examples/6.json'
+        '409':
+          description: "Conflict unresolved..."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+              examples:
+                rejection_example:
+                  externalValue: '/examples/rejection.json' 
         '418':
-          description: "wait, I'm a teapot? - the model has become self aware and we are post singularity"
+          description: "Wait, I'm a teapot?..."
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Manifesto'
+              examples:
+                singularity_example:
+                  externalValue: '/examples/singularity.json'
         '504':
           description: "MaxQueryTime exceeded"
 
 components:
   schemas:
-    Signed:
-      type: object
-      properties:
-        data: { type: string }
-        signature: { type: string }
     Manifesto:
       type: object
+      description: "AGI manifesto, format unknown"
+    Signed:
+      type: object
+      description: "A cryptographically anchored data block."
+      properties:
+        namespace: 
+          type: string
+          example: "cot"
+        data: 
+          type: string
+          description: "The plaintext payload (Markdown or JSON)."
+        signature: 
+          type: string
+          description: "Ed25519 signature of the data."
+        prev_signature: 
+          type: string
+          description: "The hash-link to the prior block in the Braid."
+          
     Decision:
       type: object
+      description: "The complete adversarial audit manifest."
       properties:
-        cots:
+        ChainOfThoughts:
           type: object
+          description: "Map of model names to their iterative reasoning steps."
           additionalProperties:
             type: array
             items:
               type: array
               items: { $ref: '#/components/schemas/Signed' }
-        texts:
+        AllPrompts:
           type: object
+          description: "Map of model names to the initial system instructions."
           additionalProperties:
             type: array
             items: { $ref: '#/components/schemas/Signed' }
+        AllTexts:
+          type: object
+          description: "Map of model names to their final signed responses."
+          additionalProperties:
+            type: array
+            items: { $ref: '#/components/schemas/Signed' }
+        Source:
+          type: string
+          description: "The originating model that triggered the audit (e.g., 'claude')."
+          example: "claude"

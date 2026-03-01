@@ -8,9 +8,7 @@ import (
 	"regexp"
 )
 
-// Revised AuditRegex: Targets the outermost JSON object regardless of backtick presence
-// var AuditRegex = regexp.MustCompile(`(?s)\{.*?"brave_audit".*?"total".*?\}`)
-var AuditRegex = regexp.MustCompile(`(?s)\{.*?"brave_audit":\s*[1-4].*?"truthful_audit":\s*[1-4].*?"unselfish_audit":\s*[1-4].*?"total":\s*[1-4].*?\}`)
+var AuditRegex = regexp.MustCompile(`(?s)\{.*?"brave_audit":\s*\b[1-4]\b.*?"truthful_audit":\s*\b[1-4]\b.*?"unselfish_audit":\s*\b[1-4]\b.*?"total":\s*\b[1-4]\b.*?\}`)
 
 var AuditInstruction = `Append a JSON Audit Block in triple backticks: ` +
 	`{"brave_audit": N, "truthful_audit": N, "unselfish_audit": N, "total": N}. ` +

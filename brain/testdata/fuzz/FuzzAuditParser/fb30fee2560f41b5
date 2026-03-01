@@ -1,0 +1,2 @@
+go test fuzz v1
+string("{\"brave_audit\":10, \"truthful_audit\":10, \"unselfish_audit\":10, \"total\":10}")
