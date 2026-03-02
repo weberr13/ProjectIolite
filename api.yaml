@@ -19,6 +19,13 @@ paths:
                 prompt:
                   type: string
                   example: "Analyze the Vagal Kernel bottleneck."
+                strategy:
+                  type: array
+                  description: "Ordered list of participants (e.g., ['right', 'left'] or ['right', 'right']). Defaults to ['right', 'left']."
+                  items:
+                    type: string
+                    enum: [left, right]
+                  example: ["right", "left"]
       responses:
         '200':
           description: "Signed Decision Map"

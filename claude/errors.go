@@ -21,7 +21,7 @@ func (e *ClaudeError) Sign(sv brain.SignVerifier) error {
 	return err
 }
 
-func (e *ClaudeError) CoT() []brain.Signed {
+func (e *ClaudeError) CoT(sv brain.SignVerifier) []brain.Signed {
 	return []brain.Signed{
 		brain.NewUnsigned(e.e.Error(), "cot"),
 	}

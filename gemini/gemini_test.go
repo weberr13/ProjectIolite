@@ -232,6 +232,7 @@ func TestGemini_Think(t *testing.T) {
 	ctx := context.Background()
 	mockSV := new(MockSignVerifier)
 	mockSV.On("Sign", mock.Anything).Return("sig_mock", nil)
+	mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	t.Run("Guard: Client Not Initialized (line 7)", func(t *testing.T) {
 		// Create a hollow Gemini struct without New()
@@ -336,12 +337,14 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 	})
 
 	t.Run("Branch: Final Stitching and Signing", func(t *testing.T) {
+		promptSig := "sig_p"
 		mockSV := new(MockSignVerifier)
 		mockSV.On("VerifyPy").Return("print('verify')")
 		mockSV.On("Sign", mock.Anything).Return("sig_gem_audit", nil)
 		peerOutput := new(MockResponse)
-		peerOutput.On("Text").Return(&brain.Signed{Signature: "peer_sig_123", Data: "hello"}).Maybe()
+		peerOutput.On("Text").Return(&brain.Signed{Signature: "peer_sig_123", Data: "hello", PrevSignature: promptSig}).Maybe()
 		peerOutput.On("Describe", mock.Anything).Return("manifest_data")
+		peerOutput.On("CoT", mockSV).Return([]brain.Signed{}).Maybe()
 		mockGen := new(MockModels)
 		g := &Gemini{cl: &genai.Client{}, generator: mockGen}
 
@@ -356,7 +359,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 
 		peerOutput.On("Verify", mock.Anything).Return(nil).Maybe()
 		peerOutput.On("Source").Return("gemini").Maybe()
-		peerOutput.On("Prompt").Return(brain.Signed{Signature: "sig"}).Maybe()
+		peerOutput.On("Prompt").Return(brain.Signed{Signature: promptSig}).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 		dec, err := g.Evaluate(ctx, mockSV, peerOutput, nil)
@@ -387,11 +390,12 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		}
 
 		// 1. Peer Output Mocks
-		peerOutput.On("Text").Return(&brain.Signed{Signature: pTxtSig, Data: pTxt}).Maybe()
+		peerOutput.On("Text").Return(&brain.Signed{Signature: pTxtSig, Data: pTxt, PrevSignature: pPromptSig}).Maybe()
 		peerOutput.On("Describe", mock.Anything).Return("manifest_data").Once()
 		peerOutput.On("Verify", mockSV).Return(nil).Twice()
 		peerOutput.On("Prompt").Return(brain.Signed{Signature: pPromptSig, Data: pPrompt}).Maybe()
 		peerOutput.On("Source").Return("gemini").Maybe()
+		peerOutput.On("CoT", mockSV).Return([]brain.Signed{}).Maybe()
 
 		// 2. Generation Mock
 		mockGen.On("GenerateContent", mock.Anything, "gemini-pro-latest", mock.Anything, mock.Anything).
@@ -404,7 +408,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockSV.On("Verify", b64(pPrompt)+"", pPromptSig).Return(nil).Once()
 
 		// --- STEP C: NewDecision validates the peer text ---
-		mockSV.On("Verify", b64(pTxt)+"", pTxtSig).Return(nil).Once()
+		mockSV.On("Verify", b64(pTxt)+pPromptSig, pTxtSig).Return(nil).Once()
 
 		// --- STEP D: Add() signs & immediately verifies the new Gemini Block ---
 		auditData := b64(resTxt) + pTxtSig
@@ -445,6 +449,8 @@ func TestGemini_Evaluate_FinalBranches(t *testing.T) {
 		peerOutput.On("Verify", mockSV).Return(nil).Twice()
 		peerOutput.On("Prompt").Return(brain.Signed{Signature: "", Data: "prompt"}).Maybe()
 		peerOutput.On("Source").Return("gemini").Maybe()
+		peerOutput.On("CoT", mockSV).Return([]brain.Signed{}).Maybe()
+
 		mockSV.On("Sign", mock.Anything).Return("text", nil).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
@@ -467,6 +473,8 @@ func TestGemini_Evaluate_FinalBranches(t *testing.T) {
 		peerOutput.On("Describe", mock.Anything).Return("data").Once()
 		peerOutput.On("Text").Return(&brain.Signed{Signature: "sig"}).Once()
 		peerOutput.On("Verify", mock.Anything).Return(nil).Once()
+		peerOutput.On("CoT", mockSV).Return([]brain.Signed{}).Maybe()
+		peerOutput.On("Prompt").Return(brain.Signed{Signature: "sig_p"}).Maybe()
 
 		// Use a MockDecision that purposefully fails the Add call
 		mockPrev := new(MockDecision)

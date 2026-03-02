@@ -72,7 +72,7 @@ func TestErrorResponse_Branches(t *testing.T) {
 
 	// 1. Validate Core Data Methods
 	t.Run("Data_Retrieval", func(t *testing.T) {
-		assert.Nil(t, errResp.CoT(), "CoT should return nil for ErrorResponse")
+		assert.Nil(t, errResp.CoT(mockVerifier), "CoT should return nil for ErrorResponse")
 
 		textResult := errResp.Text()
 		assert.NotNil(t, textResult)

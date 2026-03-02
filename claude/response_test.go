@@ -70,6 +70,9 @@ func TestClaudeResponse_Verify_DeepCoverage(t *testing.T) {
 
 func TestClaudeResponse_CandidatesToThoughts(t *testing.T) {
 	t.Run("Chain: Recursive PrevSignature Stitching", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
+		mockSV.On("Sign", b64("Initial logic...")+"sig_p").Return("sig1", nil).Maybe()
+		mockSV.On("Sign", b64("Refining strategy...")+"sig1").Return("sig2", nil).Maybe()
 		rawJSON := `[
 			{"type": "thinking", "thinking": "Initial logic..."},
 			{"type": "thinking", "thinking": "Refining strategy..."}
@@ -77,16 +80,19 @@ func TestClaudeResponse_CandidatesToThoughts(t *testing.T) {
 		var content []anthropic.ContentBlockUnion
 		json.Unmarshal([]byte(rawJSON), &content)
 		resp := &anthropic.Message{Content: content}
-		thoughts := candidatesToThoughts(resp)
+		thoughts, err := candidatesToThoughts(mockSV, resp, brain.Signed{Signature: "sig_p"})
 
+		assert.NoError(t, err)
 		assert.Len(t, thoughts, 2)
 		assert.Equal(t, "Initial logic...", thoughts[0].Data)
 		assert.Equal(t, "Refining strategy...", thoughts[1].Data)
 	})
 
 	t.Run("Safety: Handle Empty Content", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
 		resp := &anthropic.Message{Content: []anthropic.ContentBlockUnion{}}
-		thoughts := candidatesToThoughts(resp)
+		thoughts, err := candidatesToThoughts(mockSV, resp, brain.Signed{Signature: "sig_p"})
+		assert.NoError(t, err)
 		assert.Empty(t, thoughts)
 	})
 }

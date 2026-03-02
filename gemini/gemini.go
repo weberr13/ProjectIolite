@@ -97,7 +97,15 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		return &GeminiError{e: err}, err
 	}
 
-	result, err := g.generator.GenerateContent(ctx, g.model, genai.Text(input.Text()), g.genConfig())
+	cfg := g.genConfig()
+	inst := genai.Text(brain.ThoughtInstructions)
+	if len(inst) == 1 {
+		cfg.SystemInstruction = inst[0]
+	} else {
+		log.Printf("could not generate single part system instruction, instead we got %#v", inst)
+	}
+
+	result, err := g.generator.GenerateContent(ctx, g.model, genai.Text(input.Text()), cfg)
 	if err != nil {
 		return &GeminiError{e: err}, err
 	}
@@ -165,10 +173,22 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			return &brain.ErrorDecision{E: err}, err
 		}
 	}
-	textBlock := brain.NewUnsigned(result.Text(), "text")
-	// STITCHING: Link Gemini's audit to peer's Text Response
-	textBlock.PrevSignature = peerOutput.Text().Signature
-	err = prev.Add("gemini", candidatesToThoughts(result), textBlock, sv)
+	allThoughts := []brain.Signed{}
+	turnThoughts, err := candidatesToThoughts(sv, result, peerOutput.Prompt())
+	if err != nil {
+		return &brain.ErrorDecision{E: err}, err
+	}
+	allThoughts = append(allThoughts, turnThoughts...)
+	var textBlock brain.Signed
+	if len(allThoughts) > 0 {
+		textBlock = allThoughts[len(allThoughts)-1].NextUnsigned(result.Text(), "text")
+	} else {
+		textBlock = brain.NewUnsigned(result.Text(), "text")
+		textBlock.PrevSignature = peerOutput.Prompt().Signature
+	}
+
+	// END TODO
+	err = prev.Add("gemini", allThoughts, textBlock, sv)
 	if err != nil {
 		return prev, err
 	}
