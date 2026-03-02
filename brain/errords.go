@@ -80,6 +80,9 @@ func (e *ErrorDecision) Unwrap() error {
 	return e.E
 }
 
+func (ErrorDecision) SetAuditss(Audits) {
+}
+
 func (e *ErrorDecision) Texts() map[string][]Signed {
 	return map[string][]Signed{
 		"system": {
@@ -99,4 +102,7 @@ func (ErrorDecision) Verify(SignVerifier) error {
 func (e *ErrorDecision) Add(_ string, cot []Signed, text Signed, sv SignVerifier) error {
 	e.E = fmt.Errorf("%s: %w", text.Data, e.E)
 	return nil
+}
+
+func (ErrorDecision) SetAudits(Audits) {
 }

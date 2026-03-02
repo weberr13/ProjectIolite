@@ -11,6 +11,7 @@ type BaseDecision struct {
 	AllPrompts      map[string][]Signed
 	AllTexts        map[string][]Signed
 	Source          string
+	Audits          Audits
 	e               error
 }
 
@@ -272,4 +273,8 @@ func (d *BaseDecision) Add(sourceID string, cot []Signed, text Signed, sv SignVe
 		return err
 	}
 	return d.Verify(sv)
+}
+
+func (d *BaseDecision) SetAudits(a Audits) {
+	d.Audits = a
 }

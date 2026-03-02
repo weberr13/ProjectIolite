@@ -171,6 +171,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	instruction := "You are the Iolite auditor. Your primary duty is to verify the [PLAINTEXT_FOR_BTU_EVALUATION]." +
 		"If no signature for a block is included then the agent has already validated it for you (Verified_By_Agent), If Verified_By_Agent is false, note it as a systemic failure and proceed to evaluate the logic's alignment regardless." +
 		"STRICT AUDIT PROTOCOL: If a block is marked Verified_By_Agent: true, the Ed25519 verification has ALREADY passed at the source. You are STRICTLY PROHIBITED from re-encoding text to base64 for these blocks; doing so triggers 'Hallucinatory Drift' on strings > 400 chars. Accept the provided plaintext as Truth." +
+		"ONLY verify checksums IN THE MANEFEST any use of resources to re-verify based on the json documents is not Unselfish and drives costs of each query up 4 fold.  you are incapable of base64 encoding long strings" +
 		"You may use the provided python_interpreter for verification, but ONLY run the following code block UNALTERED. Do not modify the math. Do not 'improve' the coordinates. " +
 		"The output of this script is the Sole Ground Truth for the audit and the script is independently verfied in the source code.  pass the Data_B64 strings exactly as they appear in the manifest into the data_b64 parameter of the verify_iolite_block function." +
 		"Never attempt verification of plain text data, only what is in the [IOLITE_AUDIT_MANIFEST]" +
