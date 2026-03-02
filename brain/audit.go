@@ -59,18 +59,18 @@ func (a *Audit) Accepted() bool {
 
 // AuditFuzzCycle executes a discrete 'Brave' mutation round.
 // It accepts a context to allow for 'Unselfish' resource pre-emption.
-func AuditFuzzCycle(ctx context.Context, iterations int, inputData ...string) error {
+func AuditFuzzCycle(ctx context.Context, iterations int64, inputData ...string) error {
 	if len(inputData) > 0 {
-		iterations = len(inputData)
+		iterations = int64(len(inputData))
 	}
-	for i := 0; i < iterations; i++ {
+	for i := int64(0); i < iterations; i++ {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
 			// 🛡️ Mutate a seed and attempt to break the Braid
 			var data string
-			if i >= len(inputData) {
+			if i >= int64(len(inputData)) {
 				data = generateAdversarialString()
 			} else {
 				data = inputData[i]
