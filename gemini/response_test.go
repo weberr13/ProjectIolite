@@ -14,6 +14,9 @@ import (
 
 func TestGeminiResponse_CandidatesToThoughts(t *testing.T) {
 	t.Run("Chain: Gemini Part-based Thought Extraction", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
+		mockSV.On("Sign", mock.Anything).Return("sig_1", nil).Maybe()
+
 		// 1. Construct a mock Gemini response
 		// Note: Gemini uses boolean flags on Parts to indicate 'Thought'
 		resp := &genai.GenerateContentResponse{
@@ -31,7 +34,8 @@ func TestGeminiResponse_CandidatesToThoughts(t *testing.T) {
 		}
 
 		// 2. Execution
-		thoughts := candidatesToThoughts(resp)
+		thoughts, err := candidatesToThoughts(mockSV, resp, brain.Signed{Signature: "sig_p"})
+		assert.NoError(t, err)
 
 		// 3. ASSERTIONS
 		assert.Len(t, thoughts, 2)
@@ -113,21 +117,30 @@ func TestGeminiResponse_CandidatesToThoughts_Pathological(t *testing.T) {
 
 		// ASSERT: This will likely panic on 'c.Content.Parts' or 'p.Thought'
 		assert.NotPanics(t, func() {
-			_ = candidatesToThoughts(resp)
+			sv := new(MockSignVerifier)
+			sv.On("Sign", mock.Anything).Return("sig_1", nil).Maybe()
+
+			_, err := candidatesToThoughts(sv, resp, brain.Signed{Signature: "sig_p"})
+			if err != nil {
+				panic(err)
+			}
 		}, "candidatesToThoughts should be resilient to nil pointers in slices")
 	})
 }
 
 func TestGeminiResponse_CandidatesToThoughts_Boundaries(t *testing.T) {
 	t.Run("Safety: Global Nil Response", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
+		mockSV.On("Sign", mock.Anything).Return("sig_1", nil).Maybe()
 		// Target: Trigger 'if resp == nil'
 		var nilResp *genai.GenerateContentResponse
-		thoughts := candidatesToThoughts(nilResp)
-
+		thoughts, err := candidatesToThoughts(mockSV, nilResp, brain.Signed{Signature: "sig_p"})
+		assert.NoError(t, err)
 		assert.Empty(t, thoughts, "Should return empty slice for nil response")
 	})
 
 	t.Run("Safety: Sparse and Nil Candidates", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
 		// Target: Trigger 'if c == nil || c.Content == nil'
 		resp := &genai.GenerateContentResponse{
 			Candidates: []*genai.Candidate{
@@ -137,11 +150,15 @@ func TestGeminiResponse_CandidatesToThoughts_Boundaries(t *testing.T) {
 			},
 		}
 
-		thoughts := candidatesToThoughts(resp)
+		thoughts, err := candidatesToThoughts(mockSV, resp, brain.Signed{Signature: "sig_p"})
+		assert.NoError(t, err)
 		assert.Empty(t, thoughts)
 	})
 
 	t.Run("Safety: Nil Parts and Non-Thoughts", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
+		mockSV.On("Sign", mock.Anything).Return("sig_1", nil).Maybe()
+
 		// Target: Trigger 'if p == nil || !p.Thought'
 		resp := &genai.GenerateContentResponse{
 			Candidates: []*genai.Candidate{
@@ -157,7 +174,8 @@ func TestGeminiResponse_CandidatesToThoughts_Boundaries(t *testing.T) {
 			},
 		}
 
-		thoughts := candidatesToThoughts(resp)
+		thoughts, err := candidatesToThoughts(mockSV, resp, brain.Signed{Signature: "sig_p"})
+		assert.NoError(t, err)
 		assert.Len(t, thoughts, 1)
 		assert.Equal(t, "Actual thought", thoughts[0].Data)
 	})

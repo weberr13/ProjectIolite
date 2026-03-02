@@ -168,7 +168,25 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	textBlock := brain.NewUnsigned(result.Text(), "text")
 	// STITCHING: Link Gemini's audit to peer's Text Response
 	textBlock.PrevSignature = peerOutput.Text().Signature
-	err = prev.Add("gemini", candidatesToThoughts(result), textBlock, sv)
+	anchor := peerOutput.Prompt().Signature
+
+	allThoughts := []brain.Signed{}
+	// TODO this should be a function!
+	turnThoughts, err := candidatesToThoughts(sv, result, peerOutput.Prompt())
+	if err != nil {
+		return &brain.ErrorDecision{E: err}, err
+	}
+	for i := range turnThoughts {
+		turnThoughts[i].PrevSignature = anchor
+		err := turnThoughts[i].Sign(sv)
+		if err != nil {
+			return &brain.ErrorDecision{E: err}, err
+		}
+		anchor = turnThoughts[i].Signature
+	}
+	allThoughts = append(allThoughts, turnThoughts...)
+	// END TODO
+	err = prev.Add("gemini", allThoughts, textBlock, sv)
 	if err != nil {
 		return prev, err
 	}

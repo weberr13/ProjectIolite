@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestGeminiError_Interface(t *testing.T) {
@@ -96,15 +97,17 @@ func TestGeminiError_DeepCoverage(t *testing.T) {
 	inputPrompt := "Generate a complex analysis"
 
 	t.Run("CoT: Verify Unsigned Slice Construction", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
+		mockSV.On("Sign", mock.Anything).Return("sig_1", nil).Maybe()
 		ge := &GeminiError{e: innerErr}
 
-		cot := ge.CoT()
+		cot := ge.CoT(mockSV)
 
 		// ASSERT: The CoT should contain exactly one element wrapping the error string
 		assert.Len(t, cot, 1)
 		assert.Equal(t, innerErr.Error(), cot[0].Data)
 		assert.Equal(t, "cot", cot[0].Namespace)
-		assert.Empty(t, cot[0].Signature, "CoT should be NewUnsigned by default")
+		assert.Equal(t, cot[0].Signature, "sig_1", "CoT should be Sigined! by default")
 	})
 
 	t.Run("Error: Verify Formatted String and Quoting", func(t *testing.T) {

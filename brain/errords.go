@@ -8,7 +8,7 @@ type ErrorResponse struct {
 	E error
 }
 
-func (ErrorResponse) CoT() []Signed {
+func (ErrorResponse) CoT(_ SignVerifier) []Signed {
 	return nil
 }
 

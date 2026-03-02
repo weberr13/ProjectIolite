@@ -159,6 +159,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if c.generator == nil {
 		return &brain.ErrorDecision{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
 	}
+	err := peerOutput.Sign(sv)
 	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
 	if prev != nil {
 		s, _ := json.MarshalIndent(prev, " ", " ")
@@ -213,7 +214,10 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			break
 		}
 		// 1. Capture any thinking from THIS turn
-		turnThoughts := candidatesToThoughts(message)
+		turnThoughts, err := candidatesToThoughts(sv, message, peerOutput.Prompt())
+		if err != nil {
+			return &brain.ErrorDecision{E: err}, err
+		}
 		allThoughts = append(allThoughts, turnThoughts...)
 
 		if message.StopReason != "tool_use" {
@@ -263,7 +267,13 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		err := fmt.Errorf("exceeded max tokens by using %d", message.Usage.OutputTokens)
 		return &brain.ErrorDecision{E: err}, err
 	}
-	allThoughts = append(allThoughts, candidatesToThoughts(message)...)
+	// TODO this should be a function!
+	turnThoughts, err := candidatesToThoughts(sv, message, peerOutput.Prompt())
+	if err != nil {
+		return &brain.ErrorDecision{E: err}, err
+	}
+	allThoughts = append(allThoughts, turnThoughts...)
+	// END TODO
 	if prev == nil {
 		log.Printf("creating new decision struct")
 		prev, err = NewDecision(peerOutput, sv)

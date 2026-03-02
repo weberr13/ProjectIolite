@@ -24,24 +24,38 @@ type ClaudeResponse struct {
 	*brain.BaseResponse
 }
 
-func candidatesToThoughts(resp *anthropic.Message) []brain.Signed {
+func candidatesToThoughts(sv brain.SignVerifier, resp *anthropic.Message, prompt brain.Signed) ([]brain.Signed, error) {
 	thoughts := []brain.Signed{}
 	for _, c := range resp.Content {
 		if c.Type == "thinking" || c.Type == "redacted_thinking" { // What is redacted thinking????
 			last := len(thoughts) - 1
 			if last < 0 {
-				thoughts = append(thoughts, brain.NewUnsigned(c.AsThinking().Thinking, "cot"))
+				t := prompt.NextUnsigned(c.AsThinking().Thinking, "cot")
+				err := t.Sign(sv)
+				if err != nil {
+					return nil, err
+				}
+				thoughts = append(thoughts, t)
 			} else {
-				thoughts = append(thoughts, thoughts[last].NextUnsigned(c.AsThinking().Thinking))
+				t := thoughts[last].NextUnsigned(c.AsThinking().Thinking)
+				err := t.Sign(sv)
+				if err != nil {
+					return nil, err
+				}
+				thoughts = append(thoughts, t)
 			}
 		}
 	}
-	return thoughts
+	return thoughts, nil
 }
 
-func (r *ClaudeResponse) CoT() []brain.Signed {
+func (r *ClaudeResponse) CoT(sv brain.SignVerifier) []brain.Signed {
 	if r.cot == nil {
-		r.cot = candidatesToThoughts(r.resp)
+		cot, err := candidatesToThoughts(sv, r.resp, r.Prompt())
+		if err != nil {
+			return nil
+		}
+		r.cot = cot
 	}
 	return r.cot
 }
@@ -56,7 +70,7 @@ func (r *ClaudeResponse) Text() *brain.Signed {
 
 func (r *ClaudeResponse) Sign(sv brain.SignVerifier) error {
 	if r.cot == nil {
-		_ = r.CoT()
+		_ = r.CoT(sv)
 	}
 	if r.thought == nil {
 		_ = r.Text()
@@ -139,7 +153,7 @@ func (r *ClaudeResponse) Describe(sv brain.SignVerifier) string {
 	builder.WriteString(`""" produced the response json """`)
 	builder.WriteString(objToString(r.thought))
 	builder.WriteString(`""" with chain of thought described by the following json array of signed responses: `)
-	builder.WriteString(objToString(r.CoT()))
+	builder.WriteString(objToString(r.CoT(sv)))
 	builder.WriteString("each signature in the 3 json objects above can be cryptograpically verified using ")
 	builder.WriteString(sv.Alg())
 	builder.WriteString(" and public key ")

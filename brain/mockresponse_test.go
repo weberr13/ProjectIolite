@@ -7,8 +7,8 @@ import (
 // MockResponse is now exported for use in gemini/claude tests
 type MockResponse struct{ mock.Mock }
 
-func (m *MockResponse) CoT() []Signed {
-	args := m.Called()
+func (m *MockResponse) CoT(sv SignVerifier) []Signed {
+	args := m.Called(sv)
 	return args.Get(0).([]Signed)
 }
 

@@ -26,9 +26,13 @@ func NewUnsigned(data, namespace string) Signed {
 	}
 }
 
-func (s *Signed) NextUnsigned(data string) Signed {
+func (s *Signed) NextUnsigned(data string, newNamespace ...string) Signed {
+	ns := s.Namespace
+	if len(newNamespace) > 0 && len(newNamespace[0]) > 0 {
+		ns = newNamespace[0]
+	}
 	return Signed{
-		Namespace:     s.Namespace,
+		Namespace:     ns,
 		Data:          data,
 		PrevSignature: s.Signature,
 	}

@@ -74,10 +74,11 @@ func TestClaudeError_DeepCoverage(t *testing.T) {
 	})
 
 	t.Run("CoT and Text: Verification of Signed Wrappers", func(t *testing.T) {
+		mockSV := new(MockSignVerifier)
 		ce := &ClaudeError{e: rootErr}
 
 		// Test CoT() slice construction
-		cot := ce.CoT()
+		cot := ce.CoT(mockSV)
 		assert.Len(t, cot, 1)
 		assert.Equal(t, rootErr.Error(), cot[0].Data)
 		assert.Equal(t, "cot", cot[0].Namespace)

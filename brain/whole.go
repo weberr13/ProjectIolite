@@ -40,7 +40,7 @@ func (r *Request) Text() string {
 }
 
 type Response interface {
-	CoT() []Signed
+	CoT(SignVerifier) []Signed
 	Text() *Signed
 	Prompt() Signed
 	// Describe will formulate the response in a way that the other model can "comprehend" that it is the output
