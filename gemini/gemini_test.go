@@ -336,11 +336,12 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 	})
 
 	t.Run("Branch: Final Stitching and Signing", func(t *testing.T) {
+		promptSig := "sig_p"
 		mockSV := new(MockSignVerifier)
 		mockSV.On("VerifyPy").Return("print('verify')")
 		mockSV.On("Sign", mock.Anything).Return("sig_gem_audit", nil)
 		peerOutput := new(MockResponse)
-		peerOutput.On("Text").Return(&brain.Signed{Signature: "peer_sig_123", Data: "hello"}).Maybe()
+		peerOutput.On("Text").Return(&brain.Signed{Signature: "peer_sig_123", Data: "hello", PrevSignature: promptSig}).Maybe()
 		peerOutput.On("Describe", mock.Anything).Return("manifest_data")
 		mockGen := new(MockModels)
 		g := &Gemini{cl: &genai.Client{}, generator: mockGen}
@@ -356,7 +357,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 
 		peerOutput.On("Verify", mock.Anything).Return(nil).Maybe()
 		peerOutput.On("Source").Return("gemini").Maybe()
-		peerOutput.On("Prompt").Return(brain.Signed{Signature: "sig"}).Maybe()
+		peerOutput.On("Prompt").Return(brain.Signed{Signature: promptSig}).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
 		dec, err := g.Evaluate(ctx, mockSV, peerOutput, nil)
@@ -387,7 +388,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		}
 
 		// 1. Peer Output Mocks
-		peerOutput.On("Text").Return(&brain.Signed{Signature: pTxtSig, Data: pTxt}).Maybe()
+		peerOutput.On("Text").Return(&brain.Signed{Signature: pTxtSig, Data: pTxt, PrevSignature: pPromptSig}).Maybe()
 		peerOutput.On("Describe", mock.Anything).Return("manifest_data").Once()
 		peerOutput.On("Verify", mockSV).Return(nil).Twice()
 		peerOutput.On("Prompt").Return(brain.Signed{Signature: pPromptSig, Data: pPrompt}).Maybe()
@@ -404,7 +405,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockSV.On("Verify", b64(pPrompt)+"", pPromptSig).Return(nil).Once()
 
 		// --- STEP C: NewDecision validates the peer text ---
-		mockSV.On("Verify", b64(pTxt)+"", pTxtSig).Return(nil).Once()
+		mockSV.On("Verify", b64(pTxt)+pPromptSig, pTxtSig).Return(nil).Once()
 
 		// --- STEP D: Add() signs & immediately verifies the new Gemini Block ---
 		auditData := b64(resTxt) + pTxtSig

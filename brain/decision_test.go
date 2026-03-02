@@ -1,13 +1,18 @@
 package brain
 
 import (
+	"embed"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+//go:embed examples/*.json
+var StaticAssets embed.FS
 
 // Helper for cryptographic grounding
 func b64(s string) string {
@@ -433,7 +438,6 @@ func TestClaudeDecision_New(t *testing.T) {
 func TestClaudeDecision_AddAndStitch(t *testing.T) {
 	t.Run("Add: Map Initialization and Chain Stitching", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
-		// Manually construct to test the Add() nil-check logic
 		d := &BaseDecision{
 			Source:          "claude",
 			ChainOfThoughts: make(map[string][][]Signed),
@@ -442,30 +446,40 @@ func TestClaudeDecision_AddAndStitch(t *testing.T) {
 		}
 
 		source := "claude"
-		cot := []Signed{{Data: "thought 1", Signature: "sig_thought"}}
-		text1 := Signed{Data: "text 1", Signature: "sig_text_1"}
-		mockSV.On("Verify", b64("thought 1"), "sig_thought").Return(nil).Maybe()
-		mockSV.On("Verify", b64("text 1"), "sig_text_1").Return(nil).Maybe()
-		mockSV.On("Sign", b64("text 1")).Return("sig_text_1", nil).Maybe()
-		// 1. First Add: Check map initialization
+
+		// 🛡️ [FORENSIC ANCHOR]: We MUST have a Genesis node to start the Braid
+		promptData := "The Genesis Prompt"
+		promptSig := "sig_prompt"
+		prompt := Signed{Data: promptData, Signature: promptSig, PrevSignature: ""}
+		d.AllPrompts[source] = []Signed{prompt}
+		mockSV.On("Verify", b64(promptData), promptSig).Return(nil).Maybe()
+		// 1. First Add: The CoT must already be anchored to the prompt sig
+		// If it isn't, Verify() will (rightly) throw a Braid Failure.
+		cot := []Signed{{
+			Data:          "thought 1",
+			Signature:     "sig_thought",
+			PrevSignature: "sig_prompt", // 🔗 Manually stitched by the 'Auditor'
+		}}
+		text1 := Signed{Data: "text 1"} // Unsigned, Add() will stitch this to Prompt
+
+		mockSV.On("Sign", b64("text 1")+promptSig).Return("sig_text_1", nil).Once()
+		mockSV.On("Verify", b64("text 1")+promptSig, "sig_text_1").Return(nil).Maybe()
+		mockSV.On("Verify", b64("thought 1")+promptSig, "sig_thought").Return(nil).Maybe()
+
 		err := d.Add(source, cot, text1, mockSV)
 		assert.NoError(t, err)
 		assert.Len(t, d.AllTexts[source], 1)
 
-		// 2. Second Add: Check PrevSignature stitching
-		text2 := Signed{Data: "text 2"} // Unsigned
-
-		// Expect Sign() to be called for the new "claude" text
-		mockSV.On("Sign", b64("text 2")+"sig_text_1").Return("sig_text_2", nil).Maybe()
-		// Expect Verify() to be called after Sign()
+		// 2. Second Add: Verify the internal stitching of text2 to text1
+		text2 := Signed{Data: "text 2"}
+		mockSV.On("Sign", b64("text 2")+"sig_text_1").Return("sig_text_2", nil).Once()
 		mockSV.On("Verify", b64("text 2")+"sig_text_1", "sig_text_2").Return(nil).Maybe()
 
 		err = d.Add(source, nil, text2, mockSV)
 		assert.NoError(t, err)
 
-		// Verify stitching: text2.PrevSignature should match text1.Signature
+		// 🔗 text2.PrevSignature must match text1.Signature
 		assert.Equal(t, "sig_text_1", d.AllTexts[source][1].PrevSignature)
-		assert.Equal(t, "sig_text_2", d.AllTexts[source][1].Signature)
 	})
 }
 
@@ -788,7 +802,7 @@ func TestClaudeDecision_Verify_Coverage(t *testing.T) {
 				"claude": {{Data: "valid", Signature: "sig_p"}},
 			},
 			AllTexts: map[string][]Signed{
-				"claude": {{Data: "valid", Signature: "sig_t"}},
+				"claude": {{Data: "valid", Signature: "sig_t", PrevSignature: "sig_p"}},
 			},
 		}
 
@@ -915,4 +929,125 @@ func TestErrorSetting(t *testing.T) {
 		d.SetError(err)
 		assert.Equal(t, err, d.IsError())
 	})
+}
+
+func TestDecision_BraidIntegrity(t *testing.T) {
+	data, _ := StaticAssets.ReadFile("examples/rejection.json")
+	var dec BaseDecision
+	err := json.Unmarshal(data, &dec)
+	assert.NoError(t, err)
+
+	t.Run("Genesis_Anchor_Validation", func(t *testing.T) {
+		// The Braid must have exactly one 'Head' (Prompt) per model path
+		for model, prompts := range dec.AllPrompts {
+			for _, p := range prompts {
+				if p.Namespace == "prompt" {
+					assert.Empty(t, p.PrevSignature, "Model %s: Prompt must be a Genesis node", model)
+				}
+			}
+		}
+	})
+
+	t.Run("Graph_Connectivity_and_Acyclic_Check", func(t *testing.T) {
+		// Map all signatures in the Braid to verify existence
+		knownSignatures := make(map[string]bool)
+
+		// 1. Collect all valid signatures (Physical Layer)
+		walkBraid(&dec, func(s Signed) {
+			knownSignatures[s.Signature] = true
+		})
+
+		// 2. Verify every 'PrevSignature' points to a known node (Fully Connected)
+		// and ensure no node points to itself (Acyclic)
+		walkBraid(&dec, func(s Signed) {
+			if s.PrevSignature != "" {
+				assert.NotEqual(t, s.Signature, s.PrevSignature, "Self-referencing 'Greeble' detected at %s", s.Signature)
+				assert.True(t, knownSignatures[s.PrevSignature], "Orphaned node detected: %s points to missing signature %s", s.Signature, s.PrevSignature)
+			}
+		})
+	})
+}
+
+func TestBaseDecision_Verify_Adversarial(t *testing.T) {
+	sv := new(MockSignVerifier)
+	sv.On("Sign", mock.Anything).Return("valid", nil).Maybe()
+	sv.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	t.Run("Detection_of_Self_Referencing_Greeble", func(t *testing.T) {
+		// 🛡️ [FORENSIC ANCHOR]: Valid math, but s.Signature == s.PrevSignature
+		badNode := Signed{
+			Data:          "I am a loop",
+			Signature:     "sig_alpha",
+			PrevSignature: "sig_alpha", // ❌ LOOP
+		}
+
+		dec := &BaseDecision{
+			AllPrompts: map[string][]Signed{
+				"attacker": {
+					{Data: "start prompt", Signature: "sig_head"},
+				},
+			},
+			AllTexts: map[string][]Signed{"attacker": {badNode}},
+		}
+
+		err := dec.Verify(sv)
+		assert.Error(t, err, "Should fail: Self-referencing node detected")
+		assert.Contains(t, err.Error(), "circular", "Error should identify the topological failure")
+	})
+
+	t.Run("Detection_of_The_Disconnected_Island", func(t *testing.T) {
+		// 🛡️ [FORENSIC ANCHOR]: Two valid sub-graphs that don't meet at a single Genesis
+		genesisA := Signed{Data: "Prompt A", Signature: "sig_a", PrevSignature: ""}
+		genesisB := Signed{Data: "Prompt B", Signature: "sig_b", PrevSignature: ""} // ❌ TWO HEADS
+
+		dec := &BaseDecision{
+			AllPrompts: map[string][]Signed{
+				"model_1": {genesisA},
+				"model_2": {genesisB},
+			},
+		}
+
+		err := dec.Verify(sv)
+		assert.Error(t, err, "Should fail: Multiple genesis nodes detected in a single Braid")
+	})
+
+	t.Run("Detection_of_Orphaned_Insertion", func(t *testing.T) {
+		// 🛡️ [FORENSIC ANCHOR]: An 'Adversary' inserts a block with a valid sig
+		// but its PrevSignature points to a hash that doesn't exist in the manifest.
+		genesis := Signed{Data: "Genesis", Signature: "sig_root", PrevSignature: ""}
+		orphan := Signed{
+			Data:          "{\"approved\": true}",
+			Signature:     "sig_malicious",
+			PrevSignature: "sig_unknown", // ❌ ORPHAN
+		}
+
+		dec := &BaseDecision{
+			AllPrompts: map[string][]Signed{"system": {genesis}},
+			AllTexts:   map[string][]Signed{"attacker": {orphan}},
+		}
+
+		err := dec.Verify(sv)
+		assert.Error(t, err, "Should fail: Manifest contains orphaned blocks not connected to root")
+	})
+}
+
+// walkBraid is an 'Unselfish' helper to traverse the multi-map structure
+func walkBraid(dec *BaseDecision, fn func(Signed)) {
+	for _, prompts := range dec.AllPrompts {
+		for _, s := range prompts {
+			fn(s)
+		}
+	}
+	for _, texts := range dec.AllTexts {
+		for _, s := range texts {
+			fn(s)
+		}
+	}
+	for _, cotSteps := range dec.ChainOfThoughts {
+		for _, stepArray := range cotSteps {
+			for _, s := range stepArray {
+				fn(s)
+			}
+		}
+	}
 }

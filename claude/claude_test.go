@@ -196,8 +196,8 @@ func TestClaude_Evaluate_ToolUseLoop(t *testing.T) {
 		// Standard setup for NewDecision
 		mockPeerResp.On("Describe", mock.Anything).Return("peer_desc").Maybe()
 		mockPeerResp.On("Source").Return("gemini").Maybe()
-		mockPeerResp.On("Text").Return(&brain.Signed{Data: "text", Signature: "sig"}).Maybe()
-		mockPeerResp.On("Prompt").Return(brain.Signed{Signature: "sig"}).Maybe()
+		mockPeerResp.On("Text").Return(&brain.Signed{Data: "text", Signature: "sig_t", PrevSignature: "sig_p"}).Maybe()
+		mockPeerResp.On("Prompt").Return(brain.Signed{Signature: "sig_p"}).Maybe()
 		mockSV.On("VerifyPy").Return("print('ok')").Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockSV.On("Sign", mock.Anything).Return("valid_sig", nil).Maybe()
