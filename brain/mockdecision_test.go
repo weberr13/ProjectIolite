@@ -27,3 +27,4 @@ func (m *MockDecision) Add(s string, c []Signed, t Signed, sv SignVerifier) erro
 func (m *MockDecision) SetError(err error) {
 	m.setErr = err
 }
+func (m *MockDecision) SetAudits(Audits) {}

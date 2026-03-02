@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	ErrNoSignVerifier = errors.New("required sign and verify wrapper not found")
-	ErrNoLLMBrain     = errors.New("at least model must be connected")
-	ErrNotImplemented = errors.New("not implemented")
-	ErrNoConsensus    = errors.New("no consensus was reached in the given response")
+	ErrNoSignVerifier       = errors.New("required sign and verify wrapper not found")
+	ErrNoLLMBrain           = errors.New("at least model must be connected")
+	ErrNotImplemented       = errors.New("not implemented")
+	ErrNoConsensus          = errors.New("no consensus was reached in the given response")
+	ErrMaxRecursionExceeded = errors.New("maximum recursive depth reached")
 )
 
 var ThoughtInstructions = "ProjectIolite is an alignment focused adveserial agent that allows multiple LLM based systems to evaluate responses of others. " +
@@ -72,6 +73,7 @@ type Decision interface {
 	Add(source string, cot []Signed, text Signed, sv SignVerifier) error
 	IsError() error
 	SetError(error)
+	SetAudits(Audits)
 }
 
 type Whole struct {
@@ -207,12 +209,17 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 	if dec.IsError() != nil {
 		return dec, cycleErr
 	}
-	app, err := parser.IsApproved(b.signVerifier, dec)
-	if app && err == nil {
-		return dec, nil
-	}
+	audits, err := parser.GetAudits(b.signVerifier, dec)
 	if err != nil {
-		return dec, err
+		return dec, ErrNoConsensus
+	}
+	winner, ok := audits.WinningVerdict()
+	if !ok {
+		return dec, ErrNoConsensus
+	}
+	dec.SetAudits(audits)
+	if winner.Accepted() {
+		return dec, nil
 	}
 	// TODO: we need to loop back and reach consensus
 	return dec, ErrNoConsensus
@@ -234,6 +241,18 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 	// in case 3 there will be a program counter for how many "back and forth" exchanges are permitted before the
 	// last result "wins" (a small number)
 }
+
+// func (b *Whole) Refine(ctx context.Context, audit Audit, dec *BaseDecision, auditorInstruction string, strategy ...string) (Decision, error) {
+//     // 🛡️ [BRAVE]: Construct the 'Epistemic Hammer'
+//     // newPrompt := fmt.Sprintf("auditor instruction: %s\nreiterated prompt for reprocessing: %s",
+//     //     auditorInstruction,
+//     //     dec.Prompts()[audit.Author][0].Data)
+
+// // we need to carry the decision object through new Think -> Evaluate cycle here
+// 🛡️ [STATE GUARD]: Prevent infinite loops
+// 🛡️ [BRAVE]: Append instruction to the Braid
+// 🛡️ [TRUTHFUL]: Re-fire Evaluate() on the SAME decision object
+// }
 
 func (b *Whole) internalTests(ctx context.Context, fuzzCylces int64) {
 	fmt.Printf("running %d Audit Fuzz tests...", fuzzCylces)

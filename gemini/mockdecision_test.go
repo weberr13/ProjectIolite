@@ -18,4 +18,5 @@ func (m *MockDecision) Add(s string, c []brain.Signed, t brain.Signed, sv brain.
 	args := m.Called(s, c, t, sv)
 	return args.Error(0)
 }
-func (m *MockDecision) SetError(err error) {}
+func (m *MockDecision) SetError(err error)     {}
+func (m *MockDecision) SetAudits(brain.Audits) {}
