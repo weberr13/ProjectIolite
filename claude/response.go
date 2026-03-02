@@ -63,6 +63,7 @@ func (r *ClaudeResponse) CoT(sv brain.SignVerifier) []brain.Signed {
 func (r *ClaudeResponse) Text() *brain.Signed {
 	if r.thought == nil {
 		s := brain.NewUnsigned(extractText(r.resp), "text")
+		s.PrevSignature = r.Prompt().Signature
 		r.thought = &s
 	}
 	return r.thought

@@ -65,15 +65,21 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 	r.Route("/v1", func(r chi.Router) {
 		r.Post("/think", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
-				Prompt string `json:"prompt"`
+				Prompt   string   `json:"prompt"`
+				Strategy []string `json:"strategy"` // 🛡️ [USER_CONTROL]
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
 				return
 			}
 
+			// Default strategy if none provided
+			if len(req.Strategy) == 0 {
+				req.Strategy = []string{"right", "left"}
+			}
+
 			// Use the app context or request context
-			decision, err := backend.Push(r.Context(), req.Prompt)
+			decision, err := backend.Push(r.Context(), req.Prompt, req.Strategy...)
 			if err != nil {
 				log.Printf("got decision : %#v", decision)
 				// Handle the singularity

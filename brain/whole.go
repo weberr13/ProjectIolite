@@ -16,6 +16,8 @@ var (
 	ErrNoConsensus    = errors.New("no consensus was reached in the given response")
 )
 
+var ThoughtInstructions = "Treat the 'Genesis Prompt' as 'Forensic' evidence. If a 'Greeble' (typo, logical error, or redundancy) is detected, you are Striclty Prohibited from smoothing it over; you MUST 'Truthfully' integrate that error into the 'Physical' response to maintain 'Epistemic Integrity'."
+
 type SignVerifier interface {
 	Sign(data string) (string, error)
 	Verify(data, signature string) error
@@ -65,8 +67,9 @@ type Decision interface {
 }
 
 type Whole struct {
-	right        Thinker // a right brain interface TODO: tightent this interface (AKA Gemini)
-	left         Thinker // a left brain interface TODO: tighten this interface (AKA Claude)
+	thinkers map[string]Thinker
+	// right        Thinker // a right brain interface TODO: tightent this interface (AKA Gemini)
+	// left         Thinker // a left brain interface TODO: tighten this interface (AKA Claude)
 	signVerifier SignVerifier
 	heartbeat    time.Duration
 	maxQueryTime time.Duration
@@ -74,8 +77,9 @@ type Whole struct {
 }
 
 type Query struct {
-	input string
-	C     chan Decision
+	input    string
+	strategy []string
+	C        chan Decision
 }
 
 type Option func(b *Whole)
@@ -88,13 +92,19 @@ func WithSignVerifier(v SignVerifier) Option {
 
 func WithLeftBrain(v Thinker) Option {
 	return func(b *Whole) {
-		b.left = v
+		if b.thinkers == nil {
+			b.thinkers = make(map[string]Thinker)
+		}
+		b.thinkers["left"] = v
 	}
 }
 
 func WithRightBrain(v Thinker) Option {
 	return func(b *Whole) {
-		b.right = v
+		if b.thinkers == nil {
+			b.thinkers = make(map[string]Thinker)
+		}
+		b.thinkers["right"] = v
 	}
 }
 
@@ -123,22 +133,25 @@ func (b *Whole) Ready() error {
 	if b.signVerifier == nil {
 		return ErrNoSignVerifier
 	}
-	if b.left == nil && b.right == nil {
+	if len(b.thinkers) == 0 {
 		return ErrNoLLMBrain
 	}
 	return nil
 }
 
-func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser) (Decision, error) {
+func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser, strategy ...string) (Decision, error) {
 	var dec Decision
 	var cycleErr error
 
 	switch {
-	case b.left == nil && b.right == nil:
+	case len(b.thinkers) == 0:
 		log.Printf("tried to think but no brains detected")
 		return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
-	case b.left == nil:
-		resp, err := b.right.Think(ctx, b.signVerifier, Request{T: prompt})
+	case len(b.thinkers) == 1:
+		var think Thinker
+		for _, think = range b.thinkers {
+		}
+		resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt})
 		if err != nil {
 			log.Printf("tried to right think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
@@ -149,22 +162,25 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 		}
-		dec, cycleErr = b.right.Evaluate(ctx, b.signVerifier, resp, nil)
-	case b.right == nil:
-		resp, err := b.left.Think(ctx, b.signVerifier, Request{T: prompt})
-		if err != nil {
-			log.Printf("tried to left think but failed: %s", err)
-			return &ErrorDecision{E: err}, err
-		}
-		if resp == nil {
-			return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
-		}
-		if resp.IsError() != nil {
-			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
-		}
-		dec, cycleErr = b.left.Evaluate(ctx, b.signVerifier, resp, nil)
+		dec, cycleErr = think.Evaluate(ctx, b.signVerifier, resp, nil)
 	default:
-		resp, err := b.right.Think(ctx, b.signVerifier, Request{T: prompt})
+		var think Thinker
+		var eval Thinker
+		var ok bool
+		if len(strategy) != 2 {
+			think = b.thinkers["right"]
+			eval = b.thinkers["left"]
+		} else {
+			think, ok = b.thinkers[strategy[0]]
+			if !ok {
+				think = b.thinkers["right"]
+			}
+			eval, ok = b.thinkers[strategy[1]]
+			if !ok {
+				think = b.thinkers["left"]
+			}
+		}
+		resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt})
 		if err != nil {
 			log.Printf("tried to right think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
@@ -175,7 +191,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 		}
-		dec, cycleErr = b.left.Evaluate(ctx, b.signVerifier, resp, nil)
+		dec, cycleErr = eval.Evaluate(ctx, b.signVerifier, resp, nil)
 	}
 	if cycleErr != nil {
 		return dec, cycleErr
@@ -271,7 +287,7 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 					log.Printf("received query %#v", q)
 					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime)
 					defer cancel()
-					d, err := b.Think(ctx, q.input, &DecisionParser{})
+					d, err := b.Think(ctx, q.input, &DecisionParser{}, q.strategy...)
 					if err != nil {
 						if err == ErrNoConsensus {
 							d.SetError(err)
@@ -294,10 +310,10 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 
 // Push sends a query to the brain and waits for the decision.
 // It respects the internal maxQueryTime for the think loop.
-func (b *Whole) Push(ctx context.Context, input string) (Decision, error) {
+func (b *Whole) Push(ctx context.Context, input string, strategy ...string) (Decision, error) {
 	c := make(chan Decision, 1)
 	select {
-	case b.queries <- Query{input: input, C: c}:
+	case b.queries <- Query{input: input, strategy: strategy, C: c}:
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}

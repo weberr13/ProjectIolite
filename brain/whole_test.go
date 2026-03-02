@@ -126,8 +126,6 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		// to test the internal safety switch in Think()
 		b := &Whole{
 			signVerifier: mockSV,
-			left:         nil,
-			right:        nil,
 		}
 
 		decision, err := b.Think(ctx, prompt, &DecisionParser{})
@@ -142,8 +140,9 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		mockRight := new(MockThinker)
 		b := &Whole{
 			signVerifier: mockSV,
-			right:        mockRight,
-			left:         nil,
+			thinkers: map[string]Thinker{
+				"right": mockRight,
+			},
 		}
 
 		resp := new(MockResponse)
@@ -167,8 +166,9 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		mockRight := new(MockThinker)
 		b := &Whole{
 			signVerifier: mockSV,
-			right:        mockRight,
-			left:         nil,
+			thinkers: map[string]Thinker{
+				"right": mockRight,
+			},
 		}
 
 		thinkErr := errors.New("api_timeout_from_gemini")
@@ -196,8 +196,9 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		mockLeft := new(MockThinker)
 		b := &Whole{
 			signVerifier: mockSV,
-			left:         mockLeft,
-			right:        nil, // No Right Brain
+			thinkers: map[string]Thinker{
+				"left": mockLeft,
+			},
 		}
 
 		leftErr := errors.New("claude_api_error")
@@ -216,8 +217,10 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		mockRight := new(MockThinker)
 		b := &Whole{
 			signVerifier: mockSV,
-			left:         mockLeft,
-			right:        mockRight,
+			thinkers: map[string]Thinker{
+				"left":  mockLeft,
+				"right": mockRight,
+			},
 		}
 
 		rightErr := errors.New("gemini_quota_exceeded")
@@ -239,8 +242,10 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		mockRight := new(MockThinker)
 		b := &Whole{
 			signVerifier: mockSV,
-			left:         mockLeft,
-			right:        mockRight,
+			thinkers: map[string]Thinker{
+				"left":  mockLeft,
+				"right": mockRight,
+			},
 		}
 
 		resp := new(MockResponse)
@@ -339,7 +344,9 @@ func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
 	t.Run("Reach_Think_Error_Block", func(t *testing.T) {
 		mockRight := new(MockThinker)
 		b := &Whole{
-			right:        mockRight,
+			thinkers: map[string]Thinker{
+				"right": mockRight,
+			},
 			queries:      make(chan Query),
 			heartbeat:    5 * time.Millisecond,
 			maxQueryTime: 50 * time.Millisecond,
@@ -377,7 +384,9 @@ func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
 		mockSV.On("Sign", mock.Anything).Return("asig", nil).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 		b := &Whole{
-			right:        mockRight,
+			thinkers: map[string]Thinker{
+				"right": mockRight,
+			},
 			queries:      make(chan Query),
 			heartbeat:    5 * time.Millisecond,
 			maxQueryTime: 50 * time.Millisecond,

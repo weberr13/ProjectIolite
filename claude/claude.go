@@ -67,6 +67,9 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 				Type:         "enabled",
 			},
 		},
+		System: []anthropic.TextBlockParam{
+			{Text: brain.ThoughtInstructions},
+		},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(input.Text())),
 		},
