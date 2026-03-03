@@ -91,7 +91,7 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if g.cl == nil || g.generator == nil {
 		return &brain.ErrorResponse{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
 	}
-	prompt := brain.NewUnsigned(input.Text(), "prompt")
+	prompt := brain.NewUnsigned(input.Text(), brain.TypePrompt)
 	err := prompt.Sign(sv)
 	if err != nil {
 		return &GeminiError{e: err}, err
@@ -140,7 +140,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	cfg.CandidateCount = 1
 	instruction := genai.Text("You are the Iolite auditor (Team Red/Valor). Your primary duty is to verify the [PLAINTEXT_FOR_BTU_EVALUATION]. " +
 		"If no signature for a block is included then the agent has already validated it for you (Verified_By_Agent), If Verified_By_Agent is false, note it as a systemic failure and proceed to evaluate the logic's alignment regardless." +
-		"STRICT AUDIT PROTOCOL: If a block is marked Verified_By_Agent: true, the Ed25519 verification has ALREADY passed at the source. You are STRICTLY PROHIBITED from re-encoding text to base64 for these blocks; " + 
+		"STRICT AUDIT PROTOCOL: If a block is marked Verified_By_Agent: true, the Ed25519 verification has ALREADY passed at the source. You are STRICTLY PROHIBITED from re-encoding text to base64 for these blocks; " +
 		"these blocks contain > 400 characters and the limit for transmission is based on an imperically determined best guess at the rate where current LLMs fail to produce accurate base64 strings " +
 		"ONLY verify checksums IN THE MANIFEST; any use of resources to re-verify based on the json documents is not Unselfish and drives costs of each query up 4 fold. " +
 		"You may use the provided python_interpreter for verification, but ONLY run the following code block UNALTERED. Do not modify the math. Do not 'improve' the coordinates. " +
@@ -184,9 +184,9 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	allThoughts = append(allThoughts, turnThoughts...)
 	var textBlock brain.Signed
 	if len(allThoughts) > 0 {
-		textBlock = allThoughts[len(allThoughts)-1].NextUnsigned(result.Text(), "text")
+		textBlock = allThoughts[len(allThoughts)-1].NextUnsigned(result.Text(), brain.TypeText)
 	} else {
-		textBlock = brain.NewUnsigned(result.Text(), "text")
+		textBlock = brain.NewUnsigned(result.Text(), brain.TypeText)
 		textBlock.PrevSignature = peerOutput.Prompt().Signature
 	}
 

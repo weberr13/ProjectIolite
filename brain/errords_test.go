@@ -34,7 +34,7 @@ func TestErrorDecision_Interface(t *testing.T) {
 		// Verify the string formatting is correct
 		expectedData := fmt.Sprintf("CRITICAL_FAILURE: %v", initialErr)
 		assert.Equal(t, expectedData, systemBlocks[0].Data)
-		assert.Equal(t, "text", systemBlocks[0].Namespace)
+		assert.Equal(t, TypeText, systemBlocks[0].Namespace)
 	})
 
 	t.Run("Add: Recursive Error Wrapping", func(t *testing.T) {

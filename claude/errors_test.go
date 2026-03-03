@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/weberr13/ProjectIolite/brain"
 )
 
 func TestClaudeError_Logic(t *testing.T) {
@@ -81,13 +82,13 @@ func TestClaudeError_DeepCoverage(t *testing.T) {
 		cot := ce.CoT(mockSV)
 		assert.Len(t, cot, 1)
 		assert.Equal(t, rootErr.Error(), cot[0].Data)
-		assert.Equal(t, "cot", cot[0].Namespace)
+		assert.Equal(t, brain.TypeThinking, cot[0].Namespace)
 
 		// Test Text() pointer return
 		txt := ce.Text()
 		assert.NotNil(t, txt)
 		assert.Equal(t, rootErr.Error(), txt.Data)
-		assert.Equal(t, "text", txt.Namespace)
+		assert.Equal(t, brain.TypeText, txt.Namespace)
 	})
 
 	t.Run("Prompt and Source: Identity Compliance", func(t *testing.T) {
@@ -96,7 +97,7 @@ func TestClaudeError_DeepCoverage(t *testing.T) {
 		// Test Prompt() construction
 		p := ce.Prompt()
 		assert.Equal(t, inputPrompt, p.Data)
-		assert.Equal(t, "prompt", p.Namespace)
+		assert.Equal(t, brain.TypePrompt, p.Namespace)
 
 		// Test Source() identification
 		assert.Equal(t, "claude", ce.Source())

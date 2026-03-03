@@ -86,7 +86,7 @@ func (ErrorDecision) SetAuditss(Audits) {
 func (e *ErrorDecision) Texts() map[string][]Signed {
 	return map[string][]Signed{
 		"system": {
-			NewUnsigned(fmt.Sprintf("CRITICAL_FAILURE: %v", e.E), "text"),
+			NewUnsigned(fmt.Sprintf("CRITICAL_FAILURE: %v", e.E), TypeText),
 		},
 	}
 }
