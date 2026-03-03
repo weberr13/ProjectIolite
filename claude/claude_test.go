@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -255,5 +256,43 @@ func TestClaude_Evaluate_ToolUseLoop(t *testing.T) {
 		assert.Contains(t, decision.Texts()["claude"][0].Data, "Approved: true")
 
 		mockGen.AssertExpectations(t)
+	})
+}
+
+// FuzzPyImportRegex adheres to the Iolite structural patterns for tool use detection
+func FuzzPyImportRegex(f *testing.F) {
+	// Forensic Seeds: Common LLM Python generation patterns and 'Greebles'
+	seeds := []string{
+		"import os\nimport sys",
+		"from typing import List, Dict",
+		"x = 42\nprint(x)",
+		"_hidden_var = True",
+		"  import os",                  // Should not match due to ^ boundary constraint
+		"def execute():\n    return 1", // Standard logic, no import
+		"123badvar = 5",                // Invalid Python identifier
+		"import\n",                     // Missing required \s+ after import
+		"__import__('os')",             // Sneaky bypass attempt
+	}
+
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+
+	// TODO: extend the Thinker interface to include a "internal testing" analog to what is done in the AuditFuzzCycle and incorporate into rumination
+	f.Fuzz(func(t *testing.T, data string) {
+		// Unselfish: Ensure the regex engine doesn't panic on arbitrary Fuzzer mutations
+		assert.NotPanics(t, func() {
+			match := pyImportRegex.FindString(data)
+
+			// Brave: If the fuzzer hallucinates a match, ensure it mathematically respects our boundaries
+			if match != "" {
+				hasImport := strings.HasPrefix(match, "import")
+				hasFrom := strings.HasPrefix(match, "from")
+				hasAssignment := strings.Contains(match, "=")
+
+				// If it matched, it MUST logically belong to one of our three capture branches
+				assert.True(t, hasImport || hasFrom || hasAssignment, "Regex extracted an impossible state: %q", match)
+			}
+		}, "Python import regex execution panic detected")
 	})
 }

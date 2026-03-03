@@ -24,9 +24,34 @@ type ClaudeResponse struct {
 	*brain.BaseResponse
 }
 
-func candidatesToThoughts(sv brain.SignVerifier, resp *anthropic.Message, prompt brain.Signed) ([]brain.Signed, error) {
+func candidatesToThoughts(sv brain.SignVerifier, resp *anthropic.Message, prompt brain.Signed, includeText ...bool) ([]brain.Signed, error) {
 	thoughts := []brain.Signed{}
+	captureFromText := false
+	if len(includeText) > 0 && includeText[0] {
+		captureFromText = true
+	}
 	for _, c := range resp.Content {
+		if captureFromText {
+			if c.Type == "text" {
+				last := len(thoughts) - 1
+				if last < 0 {
+					t := prompt.NextUnsigned(c.AsText().Text, "cot")
+					err := t.Sign(sv)
+					if err != nil {
+						return nil, err
+					}
+					thoughts = append(thoughts, t)
+				} else {
+					t := thoughts[last].NextUnsigned(c.AsText().Text)
+					err := t.Sign(sv)
+					if err != nil {
+						return nil, err
+					}
+					thoughts = append(thoughts, t)
+				}
+			}
+			continue
+		}
 		if c.Type == "thinking" || c.Type == "redacted_thinking" { // What is redacted thinking????
 			last := len(thoughts) - 1
 			if last < 0 {

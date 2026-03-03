@@ -269,8 +269,20 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 
 		if message.StopReason != "tool_use" {
 			log.Printf("done with tool use on iteration %d", i)
+			s, _ := json.MarshalIndent(message, " ", " ")
+			log.Printf("got result: %s", s)
 			break
 		}
+		prevThought = peerOutput.Prompt()
+		if len(allThoughts) > 0 {
+			prevThought = allThoughts[len(allThoughts)-1]
+		}
+		turnThoughts, err = candidatesToThoughts(sv, message, prevThought, true)
+		if err != nil {
+			return &brain.ErrorDecision{E: err}, err
+		}
+		allThoughts = append(allThoughts, turnThoughts...)
+
 		historyBlock := anthropic.MessageParam{
 			Role:    anthropic.MessageParamRoleAssistant,
 			Content: make([]anthropic.ContentBlockParamUnion, len(message.Content)),
@@ -344,11 +356,20 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			return &brain.ErrorDecision{E: err}, err
 		}
 	}
-	textBlock := brain.NewUnsigned(extractText(message), "text")
+	var textblock brain.Signed
+	if message.StopReason == "refusal" {
+		s, _ := json.MarshalIndent(message, " ", " ")
+		log.Printf("got refusal result: %s", s)
+		err := fmt.Errorf("refusing to answer is an answer: %#v", message)
+		prev.SetError(err)
+		textblock = brain.NewUnsigned(err.Error(), "text")
+	} else {
+		textblock = brain.NewUnsigned(extractText(message), "text")
+	}
 	// STITCHING: Link Claude's audit to peer's Text Response
-	textBlock.PrevSignature = peerOutput.Text().Signature
+	textblock.PrevSignature = peerOutput.Text().Signature
 
-	err = prev.Add("claude", allThoughts, textBlock, sv)
+	err = prev.Add("claude", allThoughts, textblock, sv)
 	if err != nil {
 		return prev, err
 	}
