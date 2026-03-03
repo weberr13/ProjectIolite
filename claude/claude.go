@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -153,6 +154,43 @@ func executePython(ctx context.Context, runner ScriptRunner, tooluse anthropic.T
 	return output, nil
 }
 
+var pyImportRegex = regexp.MustCompile(`(?m)^import\s+|^from\s+|^[a-zA-Z_][a-zA-Z0-9_]*\s*=`)
+
+func commentsToCoT(sv brain.SignVerifier, message *anthropic.ToolUseBlock, previous brain.Signed) ([]brain.Signed, error) {
+	b := message.JSON.Input.Raw()
+	m := map[string]any{}
+	err := json.Unmarshal([]byte(b), &m)
+	if err != nil {
+		log.Printf("could not extract raw script from ToolUseBlock raw: \"%s\", err: \"%s\"", b, err)
+		return nil, nil
+	}
+	code, ok := m["code"].(string)
+	if !ok {
+		log.Printf("could not extract raw script from ToolUseBlock raw: \"%s\", json: \"%#v\"", b, code)
+		return nil, nil
+	}
+	allThoughts := []brain.Signed{}
+	switch message.Name {
+	case "python_interpreter":
+		// A single thought block is found above the python imports in some scritps
+		loc := pyImportRegex.FindStringIndex(code)
+
+		if loc == nil {
+			log.Printf("could not parse raw script from ToolUseBlock raw: \"%s\", json: \"%#v\"", b, code)
+		}
+		thoughtText := strings.TrimSpace(code[:loc[0]])
+		if len(thoughtText) > 0 {
+			thought := previous.NextUnsigned(thoughtText)
+			err := thought.Sign(sv)
+			if err != nil {
+				return nil, err
+			}
+			allThoughts = append(allThoughts, thought)
+		}
+	}
+	return allThoughts, nil
+}
+
 // Evaluate audits another brain's output
 func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, prev brain.Decision) (brain.Decision, error) {
 	now := time.Now()
@@ -219,7 +257,11 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 			break
 		}
 		// 1. Capture any thinking from THIS turn
-		turnThoughts, err := candidatesToThoughts(sv, message, peerOutput.Prompt())
+		prevThought := peerOutput.Prompt()
+		if len(allThoughts) > 0 {
+			prevThought = allThoughts[len(allThoughts)-1]
+		}
+		turnThoughts, err := candidatesToThoughts(sv, message, prevThought)
 		if err != nil {
 			return &brain.ErrorDecision{E: err}, err
 		}
@@ -242,6 +284,17 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		for _, block := range message.Content {
 			if block.Type == "tool_use" {
 				toolUse := block.AsToolUse()
+				prevThought = peerOutput.Prompt()
+				if len(allThoughts) > 0 {
+					prevThought = allThoughts[len(allThoughts)-1]
+				}
+				commentThoughts, err := commentsToCoT(sv, &toolUse, prevThought)
+				if err != nil {
+					log.Printf("got error trying to extract script thoughts: %s", err)
+				} else if len(commentThoughts) > 0 {
+					log.Printf("found thinking in script pre-amble, likely a hidden CoT %v", &commentThoughts)
+					allThoughts = append(allThoughts, commentThoughts...)
+				}
 				log.Printf("tool request: %#v", toolUse)
 				result, err := executePython(ctx, c.runner, toolUse)
 				isErr := false
@@ -272,8 +325,12 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		err := fmt.Errorf("exceeded max tokens by using %d", message.Usage.OutputTokens)
 		return &brain.ErrorDecision{E: err}, err
 	}
-	// TODO this should be a function!
-	turnThoughts, err := candidatesToThoughts(sv, message, peerOutput.Prompt())
+
+	prevThought := peerOutput.Prompt()
+	if len(allThoughts) > 0 {
+		prevThought = allThoughts[len(allThoughts)-1]
+	}
+	turnThoughts, err := candidatesToThoughts(sv, message, prevThought)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
