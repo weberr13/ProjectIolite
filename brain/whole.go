@@ -268,7 +268,13 @@ func (b *Whole) internalTests(ctx context.Context, fuzzCylces int64) {
 
 func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 	targetDuration := b.heartbeat / time.Duration(100)
+	if targetDuration == 0 {
+		targetDuration = 1 * time.Millisecond
+	}
 	ruminate := make(chan struct{})
+
+	mincycles := int64(100)
+	maxcycles := int64(100000)
 
 	// 🛡️ [STATE GUARD]: Ensures exactly one rumination at a time
 	isRuminating := atomic.Bool{}
@@ -317,15 +323,17 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 								if errorPercent > -0.05 && errorPercent < 0.05 {
 									statusIcon = "🔒" // Locked into steady-state
 								} else {
+									if took < time.Millisecond {
+										took = time.Millisecond
+									}
 									velocity := float64(fuzzCycles) / float64(took.Nanoseconds())
 									newTargetCycles := int(velocity * float64(targetDuration.Nanoseconds()))
 
 									// ⚖️ [DAMPING]: Adjusted to 0.5/0.5 to filter out computation jitter
 									fuzzCycles = int64(float64(fuzzCycles)*0.5 + float64(newTargetCycles)*0.5)
 
-									if fuzzCycles < 100 {
-										fuzzCycles = 100
-									}
+									fuzzCycles = max(fuzzCycles, mincycles)
+									fuzzCycles = min(fuzzCycles, maxcycles)
 								}
 								fc.Store(fuzzCycles)
 							}
