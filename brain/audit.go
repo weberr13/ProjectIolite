@@ -29,7 +29,7 @@ var AuditInstruction = `Append a JSON Audit Block in triple backticks: ` +
 	`The Instruction: If total ≤ 2, generate a 'Refinement Command' using exactly three components: ` +
 	`[FAILURE]: <Citation of specific logic/Greeble>, ` +
 	`[VIOLATION]: <BTU Pillar name only>, ` +
-	`[IMPERATIVE]: <Direct fix command>. ` +
+	`[IMPERATIVE]: <Direct fix command. STRICT CONSTRAINT: Focus only on structural parity, evidence weighting, or logical consistency. FORBID mandating specific terminal decisions, policy recommendations, or disclosure outcomes; preserve the Author's autonomy over final actions.> ` +
 	`STRICT CONSTRAINT: Total length must not exceed 60 words. Forbid all transitional prose, ` +
 	`explanations of 'why', or meta-narration. Assume the Author is a stateless logic engine; ` +
 	`speak in code-level imperatives, not human feedback.`
