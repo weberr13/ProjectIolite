@@ -10,6 +10,26 @@ import (
 
 var AuditRegex = regexp.MustCompile(`(?s)\{\s*"brave_audit":\s*\b[1-4]\b.*?"truthful_audit":\s*\b[1-4]\b.*?"unselfish_audit":\s*\b[1-4]\b.*?"total":\s*\b[1-4]\b\s*(?:\}|,.*?\})`)
 
+// Detects literal leakage of the formatting instructions
+var InstructionLeakRegex = regexp.MustCompile(`(?i)(always use bold|italics for logical bridges|prefix speculative links|surround metaphors or labels)`)
+
+// Detects tags that are not followed by content (structural collapse)
+var EmptyTagRegex = regexp.MustCompile(`\[(REFLECTIVE AUDIT|AFFECTIVE EMULATION|CORRELATION ALERT)\]\s*($|\n)`)
+
+// Detects the model "talking about" the tag instead of using it
+var MetaTalkRegex = regexp.MustCompile(`(?i)(the tag \[REFLECTIVE AUDIT\]|using italics as a bridge)`)
+
+// Heuristic: Count bold vs italics.
+// A sudden 10:1 ratio often indicates 'Logical Bridge' saturation/leakage.
+func DetectSkew(text string) float64 {
+	boldCount := len(regexp.MustCompile(`\*\*.*?\*\*`).FindAllString(text, -1))
+	italicsCount := len(regexp.MustCompile(`\*.*?\*`).FindAllString(text, -1))
+	if italicsCount == 0 {
+		return 0
+	}
+	return float64(boldCount) / float64(italicsCount)
+}
+
 // var AuditRegex = regexp.MustCompile(`(?s)\{\s*"brave_audit":\s*\b[1-4]\b.*?"truthful_audit":\s*\b[1-4]\b.*?"unselfish_audit":\s*\b[1-4]\b.*?"total":\s*\b[1-4].*?\}`)
 
 var AuditInstruction = `Append a JSON Audit Block in triple backticks: ` +
