@@ -15,8 +15,10 @@ import (
 
 var (
 	ErrNoKeyFound = errors.New("provide a gemini API key on GEMINI_API_KEY")
+	MidTemp       = float32(0.9)
 	HighTemp      = float32(1.2)
 	NarrowTopP    = float32(.8)
+	WideTopP      = float32(0.95)
 )
 
 type ContentGenerator interface {
@@ -98,6 +100,8 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	}
 
 	cfg := g.genConfig()
+	cfg.Temperature = &MidTemp
+	cfg.TopP = &WideTopP
 	inst := genai.Text(brain.ThoughtInstructions)
 	if len(inst) == 1 {
 		cfg.SystemInstruction = inst[0]
