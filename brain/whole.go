@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -87,6 +88,7 @@ type Whole struct {
 	heartbeat    time.Duration
 	maxQueryTime time.Duration
 	queries      chan Query
+	mu           big.Rat
 }
 
 type Query struct {

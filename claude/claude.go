@@ -55,7 +55,7 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if c.generator == nil {
 		return &brain.ErrorResponse{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
 	}
-	prompt := brain.NewUnsigned(input.Text(), "prompt")
+	prompt := brain.NewUnsigned(input.Text(), brain.TypePrompt)
 	err := prompt.Sign(sv)
 	if err != nil {
 		return &ClaudeError{e: err}, err
@@ -364,9 +364,9 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		log.Printf("got refusal result: %s", s)
 		err := fmt.Errorf("refusing to answer is an answer: %#v", message)
 		prev.SetError(err)
-		textblock = brain.NewUnsigned(err.Error(), "text")
+		textblock = brain.NewUnsigned(err.Error(), brain.TypeText)
 	} else {
-		textblock = brain.NewUnsigned(extractText(message), "text")
+		textblock = brain.NewUnsigned(extractText(message), brain.TypeText)
 	}
 	// STITCHING: Link Claude's audit to peer's Text Response
 	textblock.PrevSignature = peerOutput.Text().Signature

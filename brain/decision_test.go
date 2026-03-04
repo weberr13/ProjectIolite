@@ -941,7 +941,7 @@ func TestDecision_BraidIntegrity(t *testing.T) {
 		// The Braid must have exactly one 'Head' (Prompt) per model path
 		for model, prompts := range dec.AllPrompts {
 			for _, p := range prompts {
-				if p.Namespace == "prompt" {
+				if p.Namespace == TypePrompt {
 					assert.Empty(t, p.PrevSignature, "Model %s: Prompt must be a Genesis node", model)
 				}
 			}

@@ -91,7 +91,7 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if g.cl == nil || g.generator == nil {
 		return &brain.ErrorResponse{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
 	}
-	prompt := brain.NewUnsigned(input.Text(), "prompt")
+	prompt := brain.NewUnsigned(input.Text(), brain.TypePrompt)
 	err := prompt.Sign(sv)
 	if err != nil {
 		return &GeminiError{e: err}, err
@@ -184,9 +184,9 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	allThoughts = append(allThoughts, turnThoughts...)
 	var textBlock brain.Signed
 	if len(allThoughts) > 0 {
-		textBlock = allThoughts[len(allThoughts)-1].NextUnsigned(result.Text(), "text")
+		textBlock = allThoughts[len(allThoughts)-1].NextUnsigned(result.Text(), brain.TypeText)
 	} else {
-		textBlock = brain.NewUnsigned(result.Text(), "text")
+		textBlock = brain.NewUnsigned(result.Text(), brain.TypeText)
 		textBlock.PrevSignature = peerOutput.Prompt().Signature
 	}
 

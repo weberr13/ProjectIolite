@@ -41,7 +41,7 @@ func TestGeminiResponse_CandidatesToThoughts(t *testing.T) {
 		assert.Len(t, thoughts, 2)
 		assert.Equal(t, "Initial Gemini logic...", thoughts[0].Data)
 		// Verification of the NextUnsigned stitching
-		assert.Equal(t, "cot", thoughts[1].Namespace)
+		assert.Equal(t, brain.TypeThinking, thoughts[1].Namespace)
 		assert.Equal(t, "Refining Gemini strategy...", thoughts[1].Data)
 	})
 }
@@ -81,7 +81,7 @@ func TestGeminiResponse_Identity(t *testing.T) {
 		// Even if everything else is nil, the prompt must be a value type
 		expected := brain.Signed{
 			Data:      "Analyze the following logs...",
-			Namespace: "prompt",
+			Namespace: brain.TypePrompt,
 			Signature: "sig_123",
 		}
 		b := brain.NewBaseResponse("gemini", expected)
@@ -91,7 +91,7 @@ func TestGeminiResponse_Identity(t *testing.T) {
 
 		assert.Equal(t, expected.Data, got.Data)
 		assert.Equal(t, expected.Signature, got.Signature)
-		assert.Equal(t, "prompt", got.Namespace)
+		assert.Equal(t, brain.TypePrompt, got.Namespace)
 	})
 }
 

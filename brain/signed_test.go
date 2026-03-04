@@ -11,7 +11,7 @@ import (
 
 func TestSigned_Flow(t *testing.T) {
 	data := "Universal Genesis Prompt"
-	namespace := "iolite.core"
+	namespace := TypeText
 	b64Data := base64.StdEncoding.EncodeToString([]byte(data))
 
 	t.Run("Happy Path: New -> Sign -> Verify", func(t *testing.T) {

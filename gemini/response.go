@@ -39,7 +39,7 @@ func candidatesToThoughts(sv brain.SignVerifier, resp *genai.GenerateContentResp
 
 			last := len(thoughts) - 1
 			if last < 0 {
-				t := prompt.NextUnsigned(p.Text, "cot")
+				t := prompt.NextUnsigned(p.Text, brain.TypeThinking)
 				err := t.Sign(sv)
 				if err != nil {
 					return nil, err
@@ -71,7 +71,7 @@ func (r *GeminiResponse) CoT(sv brain.SignVerifier) []brain.Signed {
 
 func (r *GeminiResponse) Text() *brain.Signed {
 	if r.thought == nil {
-		s := brain.NewUnsigned(r.resp.Text(), "text")
+		s := brain.NewUnsigned(r.resp.Text(), brain.TypeText)
 		r.thought = &s
 	}
 	return r.thought

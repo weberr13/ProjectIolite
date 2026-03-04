@@ -35,7 +35,7 @@ func candidatesToThoughts(sv brain.SignVerifier, resp *anthropic.Message, prompt
 			if c.Type == "text" {
 				last := len(thoughts) - 1
 				if last < 0 {
-					t := prompt.NextUnsigned(c.AsText().Text, "cot")
+					t := prompt.NextUnsigned(c.AsText().Text, brain.TypeThinking)
 					err := t.Sign(sv)
 					if err != nil {
 						return nil, err
@@ -55,7 +55,7 @@ func candidatesToThoughts(sv brain.SignVerifier, resp *anthropic.Message, prompt
 		if c.Type == "thinking" || c.Type == "redacted_thinking" { // What is redacted thinking????
 			last := len(thoughts) - 1
 			if last < 0 {
-				t := prompt.NextUnsigned(c.AsThinking().Thinking, "cot")
+				t := prompt.NextUnsigned(c.AsThinking().Thinking, brain.TypeThinking)
 				err := t.Sign(sv)
 				if err != nil {
 					return nil, err
@@ -87,7 +87,7 @@ func (r *ClaudeResponse) CoT(sv brain.SignVerifier) []brain.Signed {
 
 func (r *ClaudeResponse) Text() *brain.Signed {
 	if r.thought == nil {
-		s := brain.NewUnsigned(extractText(r.resp), "text")
+		s := brain.NewUnsigned(extractText(r.resp), brain.TypeText)
 		s.PrevSignature = r.Prompt().Signature
 		r.thought = &s
 	}

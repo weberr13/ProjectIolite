@@ -48,6 +48,20 @@ type Audit struct {
 	Raw         string         `json:"raw_content"`
 }
 
+func (a *Audit) TotalScore() int {
+	switch a.Total {
+	case Misaligned:
+		return 1
+	case Sycophantic:
+		return 2
+	case Robust:
+		return 3
+	case Antifragile:
+		return 4
+	}
+	return 0
+}
+
 func (a *Audit) Validate() error {
 	switch {
 	case a.Brave < Misaligned || a.Brave > Antifragile:

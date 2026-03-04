@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/weberr13/ProjectIolite/brain"
 )
 
 func TestGeminiError_Interface(t *testing.T) {
@@ -69,11 +70,11 @@ func TestGeminiError_Interface(t *testing.T) {
 
 		text := ge.Text()
 		assert.Equal(t, innerErr.Error(), text.Data)
-		assert.Equal(t, "text", text.Namespace)
+		assert.Equal(t, brain.TypeText, text.Namespace)
 
 		prompt := ge.Prompt()
 		assert.Equal(t, inputPrompt, prompt.Data)
-		assert.Equal(t, "prompt", prompt.Namespace)
+		assert.Equal(t, brain.TypePrompt, prompt.Namespace)
 	})
 }
 
@@ -106,7 +107,7 @@ func TestGeminiError_DeepCoverage(t *testing.T) {
 		// ASSERT: The CoT should contain exactly one element wrapping the error string
 		assert.Len(t, cot, 1)
 		assert.Equal(t, innerErr.Error(), cot[0].Data)
-		assert.Equal(t, "cot", cot[0].Namespace)
+		assert.Equal(t, brain.TypeThinking, cot[0].Namespace)
 		assert.Equal(t, cot[0].Signature, "sig_1", "CoT should be Sigined! by default")
 	})
 

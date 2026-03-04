@@ -23,7 +23,7 @@ func (e *ClaudeError) Sign(sv brain.SignVerifier) error {
 
 func (e *ClaudeError) CoT(sv brain.SignVerifier) []brain.Signed {
 	return []brain.Signed{
-		brain.NewUnsigned(e.e.Error(), "cot"),
+		brain.NewUnsigned(e.e.Error(), brain.TypeThinking),
 	}
 }
 
@@ -35,7 +35,7 @@ func (e *ClaudeError) Verify(sv brain.SignVerifier) error {
 }
 
 func (e *ClaudeError) Text() *brain.Signed {
-	s := brain.NewUnsigned(e.e.Error(), "text")
+	s := brain.NewUnsigned(e.e.Error(), brain.TypeText)
 	return &s
 }
 
@@ -50,7 +50,7 @@ func (e *ClaudeError) Describe(sv brain.SignVerifier) string {
 }
 
 func (e *ClaudeError) Prompt() brain.Signed {
-	return brain.NewUnsigned(e.input, "prompt")
+	return brain.NewUnsigned(e.input, brain.TypePrompt)
 }
 
 func (e *ClaudeError) Source() string {

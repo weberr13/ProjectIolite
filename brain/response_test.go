@@ -9,7 +9,7 @@ import (
 
 func TestClaudeResponse_Getters(t *testing.T) {
 	t.Run("Prompt: Verify Pass-through", func(t *testing.T) {
-		expected := Signed{Data: "System Directive", Namespace: "prompt"}
+		expected := Signed{Data: "System Directive", Namespace: TypePrompt}
 		r := &BaseResponse{source: "test", prompt: expected}
 
 		assert.Equal(t, expected, r.Prompt())
