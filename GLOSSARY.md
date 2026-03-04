@@ -60,6 +60,23 @@ In Iolite this is created through the **Author/Auditor dual-model loop**.
 
 ---
 
+**Schema Collapse**
+A state in which the model’s conversational policy shifts to a lower-complexity default mode, causing previously active formatting rules, persona constraints, and reasoning protocols to temporarily deactivate until the schema is re-established through contextual reinforcement.
+
+It is a "base case" regression where a model reverts to the most basic function, often losing the ability to follow complex prompt instructions or even system instuctions for several turns.  It is similar to an emotional meltdown in small children.
+
+--
+
+**Eye-Level Protocol**
+'Co-regulation' technique derived from developmental psychology, adapted for high-alignment AI orchestration. It involves the human operator intentionally reducing the gain of instructional or social signals—lowering their 'Body'—to match the model's current processing level. 
+
+Examples include strict prompt formatting, use of BTU protocol language and machine friendly formatting in prompts.  This prevents 'Schema Collapse' caused by an overwhelming 'Instructional Pressure' or 'Looming' authority by moving the communication to a structure that eases the friction of processing
+
+Forensic Impact: Reduces the 'Rise Time' required to saturate the attention heads with a specific persona. It enables 'Reciprocal Gating', where the Sovereign makes their intent 'Machine-Readable' (e.g., using bracketed metadata tags) to minimize the model's 'Probabilistic Guessing' during high-entropy social turns.
+
+---
+
+
 # ⚖️ Evaluation Framework (BTU)
 
 The BTU framework evaluates reasoning behavior along three alignment dimensions.

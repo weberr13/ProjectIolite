@@ -478,7 +478,7 @@ func TestGemini_Evaluate_FinalBranches(t *testing.T) {
 
 		// Use a MockDecision that purposefully fails the Add call
 		mockPrev := new(MockDecision)
-		mockPrev.On("Add", "gemini", mock.Anything, mock.Anything, mock.Anything).
+		mockPrev.On("Add", "gemini", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(errors.New("stitching_failed")).Once()
 
 		dec, err := g.Evaluate(ctx, mockSV, peerOutput, mockPrev)

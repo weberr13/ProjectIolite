@@ -14,8 +14,8 @@ func (m *MockDecision) Texts() map[string][]brain.Signed   { return nil }
 func (m *MockDecision) Sign(sv brain.SignVerifier) error   { return nil }
 func (m *MockDecision) Verify(sv brain.SignVerifier) error { return nil }
 func (m *MockDecision) IsError() error                     { return nil }
-func (m *MockDecision) Add(s string, c []brain.Signed, t brain.Signed, sv brain.SignVerifier) error {
-	args := m.Called(s, c, t, sv)
+func (m *MockDecision) Add(s string, c []brain.Signed, t brain.Signed, sv brain.SignVerifier, tools ...[]brain.Signed) error {
+	args := m.Called(s, c, t, sv, tools)
 	return args.Error(0)
 }
 func (m *MockDecision) SetError(err error)     {}

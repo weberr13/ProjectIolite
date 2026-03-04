@@ -23,7 +23,11 @@ func (m *MockDecision) IsError() error {
 	args := m.Called()
 	return args.Error(0)
 }
-func (m *MockDecision) Add(s string, c []Signed, t Signed, sv SignVerifier) error { return nil }
+
+func (m *MockDecision) Add(s string, c []Signed, t Signed, sv SignVerifier, _ ...[]Signed) error {
+	return nil
+}
+
 func (m *MockDecision) SetError(err error) {
 	m.setErr = err
 }

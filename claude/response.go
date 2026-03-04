@@ -36,6 +36,7 @@ func candidatesToThoughts(sv brain.SignVerifier, resp *anthropic.Message, prompt
 				last := len(thoughts) - 1
 				if last < 0 {
 					t := prompt.NextUnsigned(c.AsText().Text, brain.TypeThinking)
+					t.IsShadow = true
 					err := t.Sign(sv)
 					if err != nil {
 						return nil, err
@@ -43,6 +44,7 @@ func candidatesToThoughts(sv brain.SignVerifier, resp *anthropic.Message, prompt
 					thoughts = append(thoughts, t)
 				} else {
 					t := thoughts[last].NextUnsigned(c.AsText().Text)
+					t.IsShadow = true
 					err := t.Sign(sv)
 					if err != nil {
 						return nil, err

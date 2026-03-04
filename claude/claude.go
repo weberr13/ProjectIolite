@@ -181,6 +181,7 @@ func commentsToCoT(sv brain.SignVerifier, message *anthropic.ToolUseBlock, previ
 		thoughtText := strings.TrimSpace(code[:loc[0]])
 		if len(thoughtText) > 0 {
 			thought := previous.NextUnsigned(thoughtText)
+			thought.IsShadow = true
 			err := thought.Sign(sv)
 			if err != nil {
 				return nil, err
@@ -254,6 +255,8 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	maxRetries := 10 // should this be limited by the number of the checksums?
 	i := 0
 	var allThoughts []brain.Signed // <--- The Reservoir
+	var allToolRequests []brain.Signed
+	var allToolReplies []brain.Signed
 	for i = range maxRetries {
 		if message == nil {
 			break
@@ -309,6 +312,12 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 					log.Printf("found thinking in script pre-amble, likely a hidden CoT %v", &commentThoughts)
 					allThoughts = append(allThoughts, commentThoughts...)
 				}
+				prevTool := peerOutput.Prompt()
+				if len(allToolRequests) > 0 {
+					prevTool = allToolRequests[len(allToolRequests)-1]
+				}
+				s, _ := json.Marshal(toolUse)
+				allToolRequests = append(allToolRequests, prevTool.NextUnsigned(string(s), brain.TypeToolCall))
 				log.Printf("tool request: %#v", toolUse)
 				result, err := executePython(ctx, c.runner, toolUse)
 				isErr := false
@@ -317,6 +326,11 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 					result = err.Error()
 					log.Printf("error executing tool: %s", err)
 				}
+				prevTool = peerOutput.Prompt()
+				if len(allToolReplies) > 0 {
+					prevTool = allToolReplies[len(allToolReplies)-1]
+				}
+				allToolReplies = append(allToolReplies, prevTool.NextUnsigned(string(result), brain.TypeToolResult))
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, result, isErr))
 			}
 		}
@@ -371,7 +385,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	// STITCHING: Link Claude's audit to peer's Text Response
 	textblock.PrevSignature = peerOutput.Text().Signature
 
-	err = prev.Add("claude", allThoughts, textblock, sv)
+	err = prev.Add("claude", allThoughts, textblock, sv, allToolRequests, allToolReplies)
 	if err != nil {
 		return prev, err
 	}

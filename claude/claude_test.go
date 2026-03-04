@@ -198,12 +198,13 @@ func TestClaude_Evaluate_ToolUseLoop(t *testing.T) {
 		mockPeerResp.On("Describe", mock.Anything).Return("peer_desc").Maybe()
 		mockPeerResp.On("Source").Return("gemini").Maybe()
 		mockPeerResp.On("Text").Return(&brain.Signed{Data: "text", Signature: "sig_t", PrevSignature: "sig_p"}).Maybe()
-		mockPeerResp.On("Prompt").Return(brain.Signed{Signature: "sig_p"}).Maybe()
+		mockPeerResp.On("Prompt").Return(brain.Signed{Data: "prompt", Signature: "sig_p"}).Maybe()
 		mockPeerResp.On("CoT", mockSV).Return([]brain.Signed{}).Maybe()
 		mockSV.On("VerifyPy").Return("print('ok')").Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
-		mockSV.On("Sign", mock.Anything).Return("valid_sig", nil).Maybe()
-
+		mockSV.On("Sign", "QXVkaXQgUmVzdWx0OiBUaGUgbWF0aCBjaGVja3Mgb3V0LiBBcHByb3ZlZDogdHJ1ZQ==sig_t").Return("valid_sig", nil).Maybe()
+		mockSV.On("Sign", "ZmFpbGVkIHRvIHBhcnNlIHRvb2wgaW5wdXQ6IHVuZXhwZWN0ZWQgZW5kIG9mIEpTT04gaW5wdXQ=sig_p").Return("valid_sig2", nil).Maybe()
+		mockSV.On("Sign", "eyJpZCI6IiIsImlucHV0IjpudWxsLCJuYW1lIjoiIiwidHlwZSI6InRvb2xfdXNlIn0=sig_p").Return("valid_sig3", nil).Maybe()
 		// --- TURN 1: Claude asks to use a tool ---
 		toolID := "tool_123"
 		msg1 := &anthropic.Message{
