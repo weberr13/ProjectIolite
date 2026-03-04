@@ -1,5 +1,4 @@
 ### Project Iolite
-
 Security-first orchestration layer for LLM systems that enforces verifiable reasoning and adversarial alignment through cryptographic provenance of reasoning.
 
 ---
@@ -55,23 +54,30 @@ Iolite requires a dual-model setup (Red/Gemini and Blue/Claude) to function.
 1. ENVIRONMENT CONFIGURATION
 Export your API keys. Never share or commit these.
 
+```
 export ANTHROPIC_API_KEY=<your_key_here>
 export GEMINI_API_KEY=<your_key_here>
+```
 
 2. BUILD THE BRAID
 Compile the Go binary to create the Sovereign Executioner.
 
+```bash
 go build ./
+```
 
 3. RUN THE ENGINE
 Start the local server (default: port 8080).
 
+```bash
 ./ProjectIolite
+```
 
 4. INITIATE A 'THINK' REQUEST
 Send a prompt into the adversarial loop via curl.
 
-curl -X POST -H "Content-Type: application/json" -d '{"prompt": "In a state of terminal scarcity, why is life more robust than data?", "strategy": ["right", "left"]}' http://localh
-ost:8080/v1/think
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"prompt": "In a state of terminal scarcity, why is life more robust than data?", "strategy": ["right", "left"]}' http://localhost:8080/v1/think
+```
 
 
