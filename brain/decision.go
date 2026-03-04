@@ -7,12 +7,14 @@ import (
 )
 
 type BaseDecision struct {
-	ChainOfThoughts map[string][][]Signed
-	AllPrompts      map[string][]Signed
-	AllTexts        map[string][]Signed
-	Source          string
-	Audits          Audits
-	e               error
+	ChainOfThoughts  map[string][][]Signed
+	AllPrompts       map[string][]Signed
+	AllTexts         map[string][]Signed
+	AllToolRequests  map[string][]Signed
+	AllToolResponses map[string][]Signed
+	Source           string
+	Audits           Audits
+	e                error
 }
 
 func (e *BaseDecision) IsError() error {
@@ -36,7 +38,9 @@ func NewBaseDecision(source string, init Response, sv SignVerifier) (*BaseDecisi
 				init.Prompt(),
 			},
 		},
-		AllTexts: map[string][]Signed{},
+		AllTexts:         map[string][]Signed{},
+		AllToolRequests:  map[string][]Signed{},
+		AllToolResponses: map[string][]Signed{},
 	}
 	tx := init.Text()
 	if tx != nil {
@@ -104,6 +108,42 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 			}
 		}
 	}
+	for k := range d.AllToolRequests {
+		if k == d.Source {
+			for i := range d.AllToolRequests[k] {
+				if d.AllToolRequests[k][i].Signature == "" {
+					err := d.AllToolRequests[k][i].Sign(sv)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			for i := range d.AllToolRequests[k] {
+				if d.AllToolRequests[k][i].Signature == "" {
+					return ErrUnsigned
+				}
+			}
+		}
+	}
+	for k := range d.AllToolResponses {
+		if k == d.Source {
+			for i := range d.AllToolResponses[k] {
+				if d.AllToolResponses[k][i].Signature == "" {
+					err := d.AllToolResponses[k][i].Sign(sv)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			for i := range d.AllToolResponses[k] {
+				if d.AllToolResponses[k][i].Signature == "" {
+					return ErrUnsigned
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -124,7 +164,7 @@ func (d *BaseDecision) Verify(sv SignVerifier) error {
 		// Map the signature to the node for topological lookup
 		if _, exists := allNodes[s.Signature]; exists {
 			// This catches duplicate signatures which could confuse the Braid
-			return fmt.Errorf("duplicate signature detected: %s", s.Signature)
+			return fmt.Errorf("duplicate signature detected: %v == %v", s, allNodes[s.Signature])
 		}
 		allNodes[s.Signature] = s
 
@@ -212,6 +252,22 @@ func (d *BaseDecision) Walk(fn func(Signed) error) error {
 			}
 		}
 	}
+	for k := range d.AllToolRequests {
+		for i := range d.AllToolRequests[k] {
+			err := fn(d.AllToolRequests[k][i])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	for k := range d.AllToolResponses {
+		for i := range d.AllToolResponses[k] {
+			err := fn(d.AllToolResponses[k][i])
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -244,7 +300,7 @@ func (d *BaseDecision) Texts() map[string][]Signed {
 	return m
 }
 
-func (d *BaseDecision) Add(sourceID string, cot []Signed, text Signed, sv SignVerifier) error {
+func (d *BaseDecision) Add(sourceID string, cot []Signed, text Signed, sv SignVerifier, tools ...[]Signed) error {
 	// 1. [FORENSIC ANCHOR]: Find the tail of the current Braid for this source
 	var anchor string
 
@@ -271,6 +327,25 @@ func (d *BaseDecision) Add(sourceID string, cot []Signed, text Signed, sv SignVe
 	err := d.Sign(sv) // sign all unsigned things
 	if err != nil {
 		return err
+	}
+	switch len(tools) {
+	case 1:
+		d.AllToolRequests[sourceID] = append(d.AllToolRequests[sourceID], tools[0]...)
+		err := d.Sign(sv) // sign all unsigned things
+		if err != nil {
+			return err
+		}
+	case 2:
+		d.AllToolRequests[sourceID] = append(d.AllToolRequests[sourceID], tools[0]...)
+		err := d.Sign(sv) // sign all unsigned things
+		if err != nil {
+			return err
+		}
+		d.AllToolResponses[sourceID] = append(d.AllToolResponses[sourceID], tools[1]...)
+		err = d.Sign(sv) // sign all unsigned things
+		if err != nil {
+			return err
+		}
 	}
 	return d.Verify(sv)
 }

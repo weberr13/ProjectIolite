@@ -74,7 +74,7 @@ type Decision interface {
 	Texts() map[string][]Signed   // map of model -> turn responses
 	Sign(SignVerifier) error
 	Verify(SignVerifier) error
-	Add(source string, cot []Signed, text Signed, sv SignVerifier) error
+	Add(source string, cot []Signed, text Signed, sv SignVerifier, tools ...[]Signed) error
 	IsError() error
 	SetError(error)
 	SetAudits(Audits)
