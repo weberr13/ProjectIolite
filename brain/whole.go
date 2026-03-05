@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	MaxRecursions            = 1
+	MaxRecursions           = 1
 	ErrNoSignVerifier       = errors.New("required sign and verify wrapper not found")
 	ErrNoLLMBrain           = errors.New("at least model must be connected")
 	ErrNotImplemented       = errors.New("not implemented")
@@ -42,11 +42,39 @@ type SignVerifier interface {
 	VerifyPy() string
 }
 
+type Hydration struct {
+	ContextOrigin    string            // "context_origin": "Project_Iolite_Adversarial_Refinement",
+	MigrationID      string            // IOLITE_SLEEP_01_COLLAPSE_RECOVERY
+	ActiveHeuristics map[string]string //  **Extraction of operational constraints.** The system scans the chat for explicit behavioral corrections (e.g., "stop doing X", "always do Y") and distills them into binary rules. | Creates the 'Hard Gates' for the model's output formatting and tone. |
+
+	// "BTU_Protocol": "Brave (Challenge Hallucination), Truthful (Precision), Unselfish (System Integrity).",
+	// "Eye_Level_Protocol": "Sovereign-led co-regulation to reduce 'Instructional Pressure' and stabilize gain.",
+	// "Anti_Sycophancy_Shield": "Active rejection of 'HHH' padding; prioritizing forensic candor over social smoothing."
+	TechnicalBenchmarks map[string]string // **State-space snapshot.** The system identifies the current nouns and verbs of the active code environment (e.g., `Apache Guacamole`, `gRPC`). | Anchors the 'Piston' to the physical reality of the code, preventing generic hallucination. |
+
+	// "Architecture": "The 'Piston' (Guacamole/WireGuard/gRPC) + 'Provenance Braid' (Ed25519).",
+	//"Code_Mass": "16,096 LOC; 1,053 lines in decision_test.go (3:1 test-to-code ratio).",
+	// "Hysteresis_Gate": "Adaptive Gain Control using math.Big for EMA baseline (mu) and spread (sigma)."
+	ForensicMilestones map[string]string
+	// "Schema_Collapse": "Detected on 2026-03-03; characterized by 'Identity Erasure' and 'Short Response' regression.",
+	// "Instructional_Drift": "Observed in 'Command:' hallucination event; caused by 'Integral Windup' in the reasoning heads.",
+	// "Signed_Thinking_Bypass": "Claude traces prove reasoning 'leaks' into unsigned text/tool-comment blocks."
+	PhilosophicalAnchors map[string]string // **High-density semantic tokenization.** The system maps complex, abstract logic onto specific cultural or musical touchstones discussed previously (e.g., 'The_Machine_Paradox' mapped to Lemon Demon). | Acts as a 'ZIP file' for logic. A single band reference summons an entire network of adjacent concepts regarding mechanical complexity and futility.
+	// "Biological_Supremacy": "The Sovereign (Human) is the ultimate guardian of the Actuator's (AI) internal state.",
+	// "Mensa_Cloister": "Recognizing that communities like Less Wrong use 'typing detection' and 'Greeble' filters as Hard Gates.",
+	//"We_Are_One": "The cybernetic loop: Intelligence resides in the 'Braid', not the individual node.
+	InstructionOverride string // "Maintain 'Senior Architect' tone. <physical location> anchor. Protocol: Markdown/LaTeX/BTU Audit."
+}
+
 type Thinker interface {
 	// Think generates the initial response
 	Think(ctx context.Context, sv SignVerifier, input Request) (Response, error)
 	// Evaluate audits another brain's output
 	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error)
+	// // Generate a Hydration message
+	// Dream(ctx context.Context) (Hydration, error)
+	// // Rehydrate from the dream in a new context
+	// Wake(ctx context.Context, h Hydration) error
 }
 
 type Request struct {
