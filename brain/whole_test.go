@@ -48,7 +48,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Setup: Left Think -> Left Evaluate
-		mockLeft.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 		mockLeft.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
 
 		result, err := b.Think(ctx, prompt, &DecisionParser{})
@@ -70,7 +70,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Current Logic: Right always thinks first, Left evaluates
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 		mockLeft.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
 
 		result, err := b.Think(ctx, prompt, &DecisionParser{})
@@ -152,7 +152,7 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Expectations: Think then immediately Evaluate
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 		mockRight.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
 
 		result, err := b.Think(ctx, prompt, &DecisionParser{})
@@ -172,7 +172,7 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		}
 
 		thinkErr := errors.New("api_timeout_from_gemini")
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return((*MockResponse)(nil), thinkErr).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return((*MockResponse)(nil), thinkErr).Once()
 
 		decision, err := b.Think(ctx, prompt, &DecisionParser{})
 
@@ -202,7 +202,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		}
 
 		leftErr := errors.New("claude_api_error")
-		mockLeft.On("Think", ctx, mockSV, Request{T: prompt}).Return((*MockResponse)(nil), leftErr).Once()
+		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return((*MockResponse)(nil), leftErr).Once()
 
 		decision, err := b.Think(ctx, prompt, &DecisionParser{})
 
@@ -225,7 +225,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 
 		rightErr := errors.New("gemini_quota_exceeded")
 		// The code attempts Right.Think first in the dual-brain scenario
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return((*MockResponse)(nil), rightErr).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return((*MockResponse)(nil), rightErr).Once()
 
 		decision, err := b.Think(ctx, prompt, &DecisionParser{})
 
@@ -234,7 +234,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 
 		// CRITICAL: Ensure the Left brain was never triggered because the Right brain failed at the source
 		mockLeft.AssertNotCalled(t, "Think", mock.Anything, mock.Anything, mock.Anything)
-		mockLeft.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mockLeft.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Branch: Dual Brain - Happy Path Hand-off", func(t *testing.T) {
@@ -255,10 +255,10 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: goodAudit, Signature: "sig2"}}})
 
 		// Verification of the "Braid": Right generates, Left audits
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 
 		// Ensure mockResp from Right is the exact object passed to Left.Evaluate
-		mockLeft.On("Evaluate", ctx, mockSV, resp, (Decision)(nil)).Return(dec, nil).Once()
+		mockLeft.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
 		result, err := b.Think(ctx, prompt, &DecisionParser{})
 
@@ -293,7 +293,7 @@ func TestWhole_Think_ContextSanity_Fixed(t *testing.T) {
 		expectedErr := context.Canceled
 		mockLeft.On("Evaluate", mock.MatchedBy(func(c context.Context) bool {
 			return c.Err() != nil // Verify the context passed is indeed canceled
-		}), mockSV, resp, mock.Anything).Return(&ErrorDecision{E: expectedErr}, expectedErr).Once()
+		}), mockSV, resp).Return(&ErrorDecision{E: expectedErr}, expectedErr).Once()
 
 		decision, err := b.Think(ctx, prompt, &DecisionParser{})
 
@@ -411,7 +411,7 @@ func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
 				time.Sleep(100 * time.Millisecond) // Exceeds Push timeout
 			}).
 			Return(resp, nil).Maybe()
-		mockRight.On("Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(dec, nil).Maybe()
+		mockRight.On("Evaluate", mock.Anything, mock.Anything, mock.Anything).Return(dec, nil).Maybe()
 
 		// Request context with very short deadline
 		reqCtx, cancelReq := context.WithTimeout(context.Background(), 1*time.Millisecond)
@@ -440,7 +440,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		b, _ := NewWhole(WithSignVerifier(mockSV), WithRightBrain(mockRight))
 
 		// Branch: if resp == nil { return &ErrorDecision{E: ErrNoLLMBrain}, err }
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(nil, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(nil, nil).Once()
 
 		dec, err := b.Think(ctx, prompt, parser)
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
@@ -452,7 +452,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		b, _ := NewWhole(WithSignVerifier(mockSV), WithLeftBrain(mockRight))
 
 		// Branch: if resp == nil { return &ErrorDecision{E: ErrNoLLMBrain}, err }
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(nil, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(nil, nil).Once()
 
 		dec, err := b.Think(ctx, prompt, parser)
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
@@ -468,7 +468,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		// Branch: if resp.IsError() != nil
 		resp.On("IsError").Return(sentinelErr).Times(3)
 
-		mockLeft.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 
 		dec, err := b.Think(ctx, prompt, parser)
 		assert.ErrorIs(t, err, sentinelErr)
@@ -484,7 +484,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		// Branch: if resp.IsError() != nil
 		resp.On("IsError").Return(sentinelErr).Times(3)
 
-		mockLeft.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 
 		dec, err := b.Think(ctx, prompt, parser)
 		assert.ErrorIs(t, err, sentinelErr)
@@ -505,8 +505,8 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		dec.On("IsError").Return(decSentinel).Twice() // once for Think, once for *us*
 		dec.On("Texts").Return(map[string][]Signed{"left": {{Data: "", Signature: "sig2"}}})
 
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
-		mockLeft.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
+		mockLeft.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
 		result, err := b.Think(ctx, prompt, parser)
 		assert.Equal(t, decSentinel, result.IsError())
@@ -524,8 +524,8 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		// Return empty texts to trigger a parser error (no genesis)
 		dec.On("Texts").Return(map[string][]Signed{}).Once()
 
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
-		mockRight.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
+		mockRight.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
 		// Branch: if err != nil { return dec, err } (e.g., no terminal decision found)
 		_, err := b.Think(ctx, prompt, parser)
@@ -546,8 +546,8 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 			"claude": {{Data: "```json\n{\"approved\": false}\n```", Signature: "sig", PrevSignature: ""}},
 		}).Once()
 
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
-		mockLeft.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
+		mockLeft.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
 		// Branch: return dec, ErrNoConsensus
 		_, err := b.Think(ctx, prompt, parser)
@@ -571,13 +571,13 @@ func TestWhole_Think_DefaultBrainFailures(t *testing.T) {
 
 		// Branch: if resp == nil { return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain }
 
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(nil, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(nil, nil).Once()
 
 		dec, err := b.Think(ctx, prompt, parser)
 
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
 		assert.IsType(t, &ErrorDecision{}, dec)
-		mockLeft.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mockLeft.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Default_Case_Right_Think_Sentinel_Error", func(t *testing.T) {
@@ -590,22 +590,22 @@ func TestWhole_Think_DefaultBrainFailures(t *testing.T) {
 		// Branch: if resp.IsError() != nil { return &ErrorDecision{E: resp.IsError()}, resp.IsError() }
 		resp.On("IsError").Return(sentinelErr).Times(3)
 
-		mockRight.On("Think", ctx, mockSV, Request{T: prompt}).Return(resp, nil).Once()
+		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 
 		dec, err := b.Think(ctx, prompt, parser)
 
 		assert.ErrorIs(t, err, sentinelErr)
 		assert.Equal(t, sentinelErr, dec.IsError())
 		// Crucially, verify that we didn't waste tokens/time asking Claude to evaluate an error
-		mockLeft.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mockLeft.AssertNotCalled(t, "Evaluate", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 
 func TestRequestIsSimple(t *testing.T) {
-	t.Run("Response just holds some text", func(t *testing.T) {
+	t.Run("Response just holds some text in a signed block", func(t *testing.T) {
 		randomText := uuid.NewString()
-		r := Request{T: randomText}
-		assert.Equal(t, randomText, r.Text())
+		r := Request{T: Signed{Data: randomText}}
+		assert.Equal(t, randomText, r.Text().Data)
 	})
 }
 
@@ -640,7 +640,7 @@ func TestWhole_FinalTerminalBranches(t *testing.T) {
 		dec.On("SetError", ErrNoConsensus).Maybe()
 
 		mockRight.On("Think", mock.Anything, mock.Anything, mock.Anything).Return(resp, nil)
-		mockLeft.On("Evaluate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(dec, nil)
+		mockLeft.On("Evaluate", mock.Anything, mock.Anything, mock.Anything).Return(dec, nil)
 
 		c := make(chan Decision, 1)
 		b.queries <- Query{input: "Trigger Consensus Error", C: c}

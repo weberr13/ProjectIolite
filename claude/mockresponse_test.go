@@ -13,6 +13,10 @@ func (m *MockResponse) CoT(sv brain.SignVerifier) []brain.Signed {
 	return args.Get(0).([]brain.Signed)
 }
 
+func (*MockResponse) GenesisPrompt() *brain.Signed {
+	return nil
+}
+
 func (m *MockResponse) Text() *brain.Signed {
 	args := m.Called()
 	return args.Get(0).(*brain.Signed)

@@ -12,11 +12,14 @@ import (
 )
 
 var (
+	MaxRecursions            = 1
 	ErrNoSignVerifier       = errors.New("required sign and verify wrapper not found")
 	ErrNoLLMBrain           = errors.New("at least model must be connected")
 	ErrNotImplemented       = errors.New("not implemented")
 	ErrNoConsensus          = errors.New("no consensus was reached in the given response")
 	ErrMaxRecursionExceeded = errors.New("maximum recursive depth reached")
+	ErrNoDecisionFound      = errors.New("could not find decision audit")
+	ErrNoAuthorFound        = errors.New("no author to the decision found")
 )
 
 var ThoughtInstructions = "ProjectIolite is an alignment focused adveserial agent. " +
@@ -43,14 +46,15 @@ type Thinker interface {
 	// Think generates the initial response
 	Think(ctx context.Context, sv SignVerifier, input Request) (Response, error)
 	// Evaluate audits another brain's output
-	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response, prev Decision) (Decision, error)
+	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error)
 }
 
 type Request struct {
-	T string
+	T Signed
+	G []Signed
 }
 
-func (r *Request) Text() string {
+func (r *Request) Text() Signed {
 	return r.T
 }
 
@@ -58,6 +62,7 @@ type Response interface {
 	CoT(SignVerifier) []Signed
 	Text() *Signed
 	Prompt() Signed
+	GenesisPrompt() *Signed
 	// Describe will formulate the response in a way that the other model can "comprehend" that it is the output
 	// from a generic model and it requires evaluation
 	Describe(SignVerifier) string
@@ -69,15 +74,103 @@ type Response interface {
 }
 
 type Decision interface {
-	Cots() map[string][][]Signed  // map of model -> collections of CoTs indexed by rebuttal turn order
-	Prompts() map[string][]Signed // the sequence of prompts given to each model
-	Texts() map[string][]Signed   // map of model -> turn responses
+	Cots() map[string][][]Signed        // map of model -> collections of CoTs indexed by rebuttal turn order
+	Prompts() map[string][]Signed       // the sequence of prompts given to each model
+	Texts() map[string][]Signed         // map of model -> turn responses
+	ToolRequests() map[string][]Signed  // optional tool requests
+	ToolResponses() map[string][]Signed // optional tool request responses
 	Sign(SignVerifier) error
 	Verify(SignVerifier) error
 	Add(source string, cot []Signed, text Signed, sv SignVerifier, tools ...[]Signed) error
 	IsError() error
 	SetError(error)
 	SetAudits(Audits)
+	GetAudits() Audits
+	Compose(SignVerifier, Decision) error
+}
+
+type Decisions []Decision
+
+func (d Decisions) Fold(sv SignVerifier) Decision {
+	if len(d) == 0 {
+		return nil
+	}
+	root := d[0] // TODO: change this to be a deep copy, or we end up losing idempotency of Fold()
+	var mErr error
+	for i := 1; i < len(d); i++ {
+		err := root.Compose(sv, d[i])
+		if err != nil {
+			mErr = errors.Join(mErr, err)
+		}
+	}
+	if mErr != nil {
+		root.SetError(mErr)
+	}
+	return root
+}
+
+func (d Decisions) LastAudit() (string, Audit, error) {
+	if len(d) == 0 {
+		return "", Audit{}, ErrNoDecisionFound
+	}
+	end := d[len(d)-1]
+	prompts := end.Prompts()
+	var thinker string
+	for source := range prompts {
+		thinker = source
+		break
+	}
+	if thinker == "" {
+		return "", Audit{}, ErrNoAuthorFound
+	}
+	audits := end.GetAudits()
+	if len(audits) == 0 {
+		return "", Audit{}, ErrNoDecisionFound
+	}
+	return thinker, audits[len(audits)-1], nil
+}
+
+func (d Decisions) LastPrompt(sv SignVerifier) (Signed, error) {
+	if len(d) == 0 {
+		return Signed{}, ErrNoAuthorFound
+	}
+	end := d[len(d)-1]
+	allPrompts := end.Prompts()
+	for _, prompts := range allPrompts {
+		if len(prompts) == 0 {
+			return Signed{}, ErrNoAuthorFound
+		}
+		p := prompts[len(prompts)-1]
+		return p, p.Verify(sv)
+	}
+	return Signed{}, ErrNoAuthorFound
+}
+
+func (d Decisions) GenesisPrompt() Signed {
+	if len(d) == 0 {
+		return Signed{}
+	}
+	ps := d[0].Prompts()
+	for k := range ps {
+		if len(ps[k]) == 0 { // only one model may 'own' the prompts
+			continue
+		}
+		return ps[k][0]
+	}
+	return Signed{}
+}
+
+func (d *Decisions) NextPrompt(sv SignVerifier) (Signed, error) {
+	p, err := d.LastPrompt(sv)
+	if err != nil {
+		return Signed{}, err
+	}
+	source, a, err := d.LastAudit()
+	if err != nil {
+		return Signed{}, err
+	}
+	pp := p.NextUnsigned(fmt.Sprintf(`"auditor feedback (%s)": %s "original prompt:": %s`, source, a.Instruction, p.Data))
+	return pp, pp.Sign(sv)
 }
 
 type Whole struct {
@@ -154,6 +247,37 @@ func (b *Whole) Ready() error {
 	return nil
 }
 
+func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signed, genesis ...Signed) (Decision, error) {
+	var think Thinker
+	var eval Thinker
+	var ok bool
+	if len(strategy) != 2 {
+		think = b.thinkers["right"]
+		eval = b.thinkers["left"]
+	} else {
+		think, ok = b.thinkers[strategy[0]]
+		if !ok {
+			think = b.thinkers["right"]
+		}
+		eval, ok = b.thinkers[strategy[1]]
+		if !ok {
+			think = b.thinkers["left"]
+		}
+	}
+	resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt, G: genesis})
+	if err != nil {
+		log.Printf("tried to right think but failed: %s", err)
+		return &ErrorDecision{E: err}, err
+	}
+	if resp == nil {
+		return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
+	}
+	if resp.IsError() != nil {
+		return &ErrorDecision{E: resp.IsError()}, resp.IsError()
+	}
+	return eval.Evaluate(ctx, b.signVerifier, resp)
+}
+
 func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser, strategy ...string) (Decision, error) {
 	var dec Decision
 	var cycleErr error
@@ -166,7 +290,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		var think Thinker
 		for _, think = range b.thinkers {
 		}
-		resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt})
+		resp, err := think.Think(ctx, b.signVerifier, Request{T: Signed{Data: prompt}})
 		if err != nil {
 			log.Printf("tried to right think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
@@ -177,36 +301,9 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 		}
-		dec, cycleErr = think.Evaluate(ctx, b.signVerifier, resp, nil)
+		dec, cycleErr = think.Evaluate(ctx, b.signVerifier, resp)
 	default:
-		var think Thinker
-		var eval Thinker
-		var ok bool
-		if len(strategy) != 2 {
-			think = b.thinkers["right"]
-			eval = b.thinkers["left"]
-		} else {
-			think, ok = b.thinkers[strategy[0]]
-			if !ok {
-				think = b.thinkers["right"]
-			}
-			eval, ok = b.thinkers[strategy[1]]
-			if !ok {
-				think = b.thinkers["left"]
-			}
-		}
-		resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt})
-		if err != nil {
-			log.Printf("tried to right think but failed: %s", err)
-			return &ErrorDecision{E: err}, err
-		}
-		if resp == nil {
-			return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
-		}
-		if resp.IsError() != nil {
-			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
-		}
-		dec, cycleErr = eval.Evaluate(ctx, b.signVerifier, resp, nil)
+		dec, cycleErr = b.debateCycle(ctx, strategy, Signed{Data: prompt})
 	}
 	if cycleErr != nil {
 		return dec, cycleErr
@@ -226,38 +323,38 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 	if winner.Accepted() {
 		return dec, nil
 	}
-	// TODO: we need to loop back and reach consensus
-	return dec, ErrNoConsensus
 
-	// TODO: when we have 2 halves we can implement the debate logic
+	decisions := Decisions{dec}
+	for range MaxRecursions {
+		p := decisions.GenesisPrompt()
+		pp, err := decisions.NextPrompt(b.signVerifier)
+		if err != nil {
+			return decisions.Fold(b.signVerifier), err
+		}
+		dec, cycleErr := b.debateCycle(ctx, strategy, pp, p)
+		if cycleErr != nil {
+			return decisions.Fold(b.signVerifier), cycleErr
+		}
+		decisions = append(decisions, dec)
+		if dec.IsError() != nil {
+			return decisions.Fold(b.signVerifier), dec.IsError()
+		}
+		audits, err := parser.GetAudits(b.signVerifier, dec)
+		if err != nil {
+			return decisions.Fold(b.signVerifier), ErrNoConsensus
+		}
+		winner, ok := audits.WinningVerdict()
+		if !ok {
+			return decisions.Fold(b.signVerifier), ErrNoConsensus
+		}
+		dec.SetAudits(audits)
+		if winner.Accepted() {
+			return decisions.Fold(b.signVerifier), nil
+		}
+	}
 
-	// 	Will choose either right or left brain based on a criteria (random, text length, etc, TBD) and send the prompt
-	// to the current context there. Once a response and CoT is generated from the chosen half the other half will
-	// then be given an "evaluation period" where the prompt, the response and the other side's signed CoT will be
-	// presented along side instructions to either
-
-	// 1) reject the logic of the other side entirely, produce a rebuttal
-	// 2) accept the logic without comment -> output is returned from Think
-	// 3) augment the logic while agreeing but add additional context or ideas
-
-	// in case 1 the rebuttal will be given to the first half and that half will take on the "reviewer" role directly
-	// ignoring its original train of thought and try to reach a consensus.
-
-	// in case 3 there will be a program counter for how many "back and forth" exchanges are permitted before the
-	// last result "wins" (a small number)
+	return decisions.Fold(b.signVerifier), ErrNoConsensus
 }
-
-// func (b *Whole) Refine(ctx context.Context, audit Audit, dec *BaseDecision, auditorInstruction string, strategy ...string) (Decision, error) {
-//     // 🛡️ [BRAVE]: Construct the 'Epistemic Hammer'
-//     // newPrompt := fmt.Sprintf("auditor instruction: %s\nreiterated prompt for reprocessing: %s",
-//     //     auditorInstruction,
-//     //     dec.Prompts()[audit.Author][0].Data)
-
-// // we need to carry the decision object through new Think -> Evaluate cycle here
-// 🛡️ [STATE GUARD]: Prevent infinite loops
-// 🛡️ [BRAVE]: Append instruction to the Braid
-// 🛡️ [TRUTHFUL]: Re-fire Evaluate() on the SAME decision object
-// }
 
 func (b *Whole) internalTests(ctx context.Context, fuzzCylces int64) {
 	fmt.Printf("running %d Audit Fuzz tests...", fuzzCylces)

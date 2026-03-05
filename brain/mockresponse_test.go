@@ -12,6 +12,10 @@ func (m *MockResponse) CoT(sv SignVerifier) []Signed {
 	return args.Get(0).([]Signed)
 }
 
+func (*MockResponse) GenesisPrompt() *Signed {
+	return nil
+}
+
 func (m *MockResponse) Text() *Signed {
 	args := m.Called()
 	return args.Get(0).(*Signed)

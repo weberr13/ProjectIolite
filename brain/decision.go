@@ -17,6 +17,33 @@ type BaseDecision struct {
 	e                error
 }
 
+func (e *BaseDecision) Compose(sv SignVerifier, d Decision) error {
+	otherCoT := d.Cots()
+	for k := range otherCoT {
+		e.ChainOfThoughts[k] = append(e.ChainOfThoughts[k], otherCoT[k]...)
+	}
+	other := d.Prompts()
+	for k := range other {
+		if len(other[k]) > 1 {
+			e.AllPrompts[k] = append(e.AllPrompts[k], other[k][1:]...) // first is *always* the genesis prompt
+		}
+	}
+	other = d.Texts()
+	for k := range other {
+		e.AllTexts[k] = append(e.AllTexts[k], other[k]...)
+	}
+	other = d.ToolRequests()
+	for k := range other {
+		e.AllToolRequests[k] = append(e.AllToolRequests[k], other[k]...)
+	}
+	other = d.ToolResponses()
+	for k := range other {
+		e.AllToolResponses[k] = append(e.AllToolResponses[k], other[k]...)
+	}
+	log.Printf("test Verify: %s", e.Verify(sv))
+	return nil
+}
+
 func (e *BaseDecision) IsError() error {
 	return e.e
 }
@@ -26,6 +53,12 @@ func (e *BaseDecision) SetError(err error) {
 }
 
 func NewBaseDecision(source string, init Response, sv SignVerifier) (*BaseDecision, error) {
+	allPrompts := map[string][]Signed{}
+	genesis := init.GenesisPrompt()
+	if genesis != nil {
+		allPrompts[init.Source()] = []Signed{*genesis}
+	}
+	allPrompts[init.Source()] = append(allPrompts[init.Source()], init.Prompt())
 	b := &BaseDecision{
 		Source: source,
 		ChainOfThoughts: map[string][][]Signed{
@@ -33,15 +66,12 @@ func NewBaseDecision(source string, init Response, sv SignVerifier) (*BaseDecisi
 				init.CoT(sv),
 			},
 		},
-		AllPrompts: map[string][]Signed{
-			init.Source(): {
-				init.Prompt(),
-			},
-		},
+		AllPrompts:       allPrompts,
 		AllTexts:         map[string][]Signed{},
 		AllToolRequests:  map[string][]Signed{},
 		AllToolResponses: map[string][]Signed{},
 	}
+
 	tx := init.Text()
 	if tx != nil {
 		b.AllTexts[init.Source()] = []Signed{*tx}
@@ -164,7 +194,7 @@ func (d *BaseDecision) Verify(sv SignVerifier) error {
 		// Map the signature to the node for topological lookup
 		if _, exists := allNodes[s.Signature]; exists {
 			// This catches duplicate signatures which could confuse the Braid
-			return fmt.Errorf("duplicate signature detected: %v == %v", s, allNodes[s.Signature])
+			return fmt.Errorf("duplicate signature detected: %v == %v %#v", s, allNodes[s.Signature], d)
 		}
 		allNodes[s.Signature] = s
 
@@ -300,6 +330,24 @@ func (d *BaseDecision) Texts() map[string][]Signed {
 	return m
 }
 
+func (d *BaseDecision) ToolRequests() map[string][]Signed {
+	m := make(map[string][]Signed)
+	for k := range d.AllToolRequests {
+		m[k] = slices.Clone(d.AllToolRequests[k])
+	}
+
+	return m
+}
+
+func (d *BaseDecision) ToolResponses() map[string][]Signed {
+	m := make(map[string][]Signed)
+	for k := range d.AllToolResponses {
+		m[k] = slices.Clone(d.AllToolResponses[k])
+	}
+
+	return m
+}
+
 func (d *BaseDecision) Add(sourceID string, cot []Signed, text Signed, sv SignVerifier, tools ...[]Signed) error {
 	// 1. [FORENSIC ANCHOR]: Find the tail of the current Braid for this source
 	var anchor string
@@ -351,5 +399,9 @@ func (d *BaseDecision) Add(sourceID string, cot []Signed, text Signed, sv SignVe
 }
 
 func (d *BaseDecision) SetAudits(a Audits) {
-	d.Audits = a
+	d.Audits = append(d.Audits, a...)
+}
+
+func (d *BaseDecision) GetAudits() Audits {
+	return d.Audits
 }

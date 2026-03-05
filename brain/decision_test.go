@@ -1051,3 +1051,65 @@ func walkBraid(dec *BaseDecision, fn func(Signed)) {
 		}
 	}
 }
+
+func TestCompose(t *testing.T) {
+	t.Run("Compose will combine decisions together", func(t *testing.T) {
+		ds := Decisions{
+			&BaseDecision{
+				AllPrompts: map[string][]Signed{
+					"gemini": {{Data: "gp"}},
+				},
+				AllToolRequests: map[string][]Signed{
+					"claude": {{Data: "ct"}},
+				},
+				AllToolResponses: map[string][]Signed{
+					"claude": {{Data: "ctr"}},
+				},
+				AllTexts: map[string][]Signed{
+					"gemini": {{Data: "gt"}},
+					"claude": {{Data: "ct"}},
+				},
+				ChainOfThoughts: map[string][][]Signed{
+					"gemini": {{{Data: "gc1"}, {Data: "gc2"}}},
+					"claude": {{{Data: "cc1"}, {Data: "cc2"}}},
+				},
+			},
+			&BaseDecision{
+				AllPrompts: map[string][]Signed{
+					"gemini": {{Data: "gp"}, {Data: "next_gp"}},
+				},
+				AllToolRequests: map[string][]Signed{
+					"claude": {{Data: "next_ct"}},
+				},
+				AllToolResponses: map[string][]Signed{
+					"claude": {{Data: "next_ctr"}},
+				},
+				AllTexts: map[string][]Signed{
+					"gemini": {{Data: "next_gt"}},
+					"claude": {{Data: "next_ct"}},
+				},
+				ChainOfThoughts: map[string][][]Signed{
+					"gemini": {{{Data: "next_gc1"}, {Data: "next_gc2"}}},
+					"claude": {{{Data: "next_cc1"}, {Data: "next_cc2"}}},
+				},
+			},
+		}
+		sv := new(MockSignVerifier)
+		sv.On("Sign", mock.Anything).Return("valid", nil).Maybe()
+		sv.On("Verify", "", "sig1").Return(nil).Once()
+		folded := ds.Fold(sv)
+		// TODO: this is kinda lazy but gets the parity right
+		assert.Len(t, folded.Prompts()["gemini"], 2)
+		assert.Len(t, folded.Prompts()["claude"], 0)
+		assert.Len(t, folded.ToolRequests()["claude"], 2)
+		assert.Len(t, folded.ToolResponses()["claude"], 2)
+		assert.Len(t, folded.Texts()["claude"], 2)
+		assert.Len(t, folded.Texts()["gemini"], 2)
+		assert.Len(t, folded.Cots()["claude"], 2)
+		assert.Len(t, folded.Cots()["gemini"], 2)
+		assert.Len(t, folded.Cots()["claude"][0], 2)
+		assert.Len(t, folded.Cots()["gemini"][0], 2)
+		assert.Len(t, folded.Cots()["claude"][1], 2)
+		assert.Len(t, folded.Cots()["gemini"][1], 2)
+	})
+}

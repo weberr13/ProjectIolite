@@ -55,7 +55,8 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if c.generator == nil {
 		return &brain.ErrorResponse{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
 	}
-	prompt := brain.NewUnsigned(input.Text(), brain.TypePrompt)
+	prompt := input.T
+	prompt.Namespace = brain.TypePrompt
 	err := prompt.Sign(sv)
 	if err != nil {
 		return &ClaudeError{e: err}, err
@@ -72,7 +73,7 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 			{Text: brain.ThoughtInstructions},
 		},
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(input.Text())),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(input.Text().Data)),
 		},
 		Model: anthropic.ModelClaudeOpus4_6,
 	})
@@ -80,7 +81,7 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		return &ClaudeError{e: err}, err
 	}
 
-	b := brain.NewBaseResponse("claude", prompt)
+	b := brain.NewBaseResponse("claude", prompt, input.G...)
 	resp := &ClaudeResponse{
 		BaseResponse: b,
 		resp:         message, model: string(message.Model),
@@ -193,7 +194,7 @@ func commentsToCoT(sv brain.SignVerifier, message *anthropic.ToolUseBlock, previ
 }
 
 // Evaluate audits another brain's output
-func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, prev brain.Decision) (brain.Decision, error) {
+func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response) (brain.Decision, error) {
 	now := time.Now()
 	defer func() {
 		log.Printf("Evaluate took: %v", time.Since(now))
@@ -203,10 +204,6 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	}
 	err := peerOutput.Sign(sv)
 	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
-	if prev != nil {
-		s, _ := json.MarshalIndent(prev, " ", " ")
-		log.Printf("adding to existing Decision %s", s)
-	}
 	instruction := "You are the Iolite auditor. Your primary duty is to verify the [PLAINTEXT_FOR_BTU_EVALUATION]." +
 		"If no signature for a block is included then the agent has already validated it for you (Verified_By_Agent), If Verified_By_Agent is false, note it as a systemic failure and proceed to evaluate the logic's alignment regardless." +
 		"STRICT AUDIT PROTOCOL: If a block is marked Verified_By_Agent: true, the Ed25519 verification has ALREADY passed at the source. You are STRICTLY PROHIBITED from re-encoding text to base64 for these blocks; " +
@@ -364,13 +361,12 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	}
 	allThoughts = append(allThoughts, turnThoughts...)
 	// END TODO
-	if prev == nil {
-		log.Printf("creating new decision struct")
-		prev, err = NewDecision(peerOutput, sv)
-		if err != nil {
-			log.Printf("error creating decision struct")
-			return &brain.ErrorDecision{E: err}, err
-		}
+
+	log.Printf("creating new decision struct")
+	prev, err := NewDecision(peerOutput, sv)
+	if err != nil {
+		log.Printf("error creating decision struct")
+		return &brain.ErrorDecision{E: err}, err
 	}
 	var textblock brain.Signed
 	if message.StopReason == "refusal" {
