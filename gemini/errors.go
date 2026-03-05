@@ -22,6 +22,10 @@ func (e *GeminiError) Sign(sv brain.SignVerifier) error {
 	return err
 }
 
+func (*GeminiError) GenesisPrompt() *brain.Signed {
+	return nil
+}
+
 func (e *GeminiError) CoT(sv brain.SignVerifier) []brain.Signed {
 	s := brain.NewUnsigned(e.e.Error(), brain.TypeThinking)
 	err := s.Sign(sv)

@@ -12,6 +12,10 @@ func (ErrorResponse) CoT(_ SignVerifier) []Signed {
 	return nil
 }
 
+func (ErrorResponse) GenesisPrompt() *Signed {
+	return nil
+}
+
 func (e *ErrorResponse) Text() *Signed {
 	return &Signed{Data: e.E.Error()}
 }
@@ -56,11 +60,23 @@ type ErrorDecision struct {
 	E error
 }
 
+func (e ErrorDecision) Compose(SignVerifier, Decision) error {
+	return e.E
+}
+
 func (ErrorDecision) Cots() map[string][][]Signed {
 	return nil
 }
 
 func (ErrorDecision) Prompts() map[string][]Signed {
+	return nil
+}
+
+func (ErrorDecision) ToolRequests() map[string][]Signed {
+	return nil
+}
+
+func (ErrorDecision) ToolResponses() map[string][]Signed {
 	return nil
 }
 
@@ -81,6 +97,10 @@ func (e *ErrorDecision) Unwrap() error {
 }
 
 func (ErrorDecision) SetAuditss(Audits) {
+}
+
+func (ErrorDecision) GetAudits() Audits {
+	return nil
 }
 
 func (e *ErrorDecision) Texts() map[string][]Signed {

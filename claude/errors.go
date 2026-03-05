@@ -21,6 +21,10 @@ func (e *ClaudeError) Sign(sv brain.SignVerifier) error {
 	return err
 }
 
+func (ClaudeError) GenesisPrompt() *brain.Signed {
+	return nil
+}
+
 func (e *ClaudeError) CoT(sv brain.SignVerifier) []brain.Signed {
 	return []brain.Signed{
 		brain.NewUnsigned(e.e.Error(), brain.TypeThinking),

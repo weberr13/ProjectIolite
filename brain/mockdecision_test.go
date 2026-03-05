@@ -10,6 +10,7 @@ type MockDecision struct {
 
 func (m *MockDecision) Cots() map[string][][]Signed  { return nil }
 func (m *MockDecision) Prompts() map[string][]Signed { return nil }
+
 func (m *MockDecision) Texts() map[string][]Signed {
 	args := m.Called()
 	return args.Get(0).(map[string][]Signed)
@@ -32,3 +33,11 @@ func (m *MockDecision) SetError(err error) {
 	m.setErr = err
 }
 func (m *MockDecision) SetAudits(Audits) {}
+func (m *MockDecision) GetAudits() Audits {
+	return nil
+}
+func (m *MockDecision) ToolRequests() map[string][]Signed  { return nil }
+func (m *MockDecision) ToolResponses() map[string][]Signed { return nil }
+func (*MockDecision) Compose(SignVerifier, Decision) error {
+	return nil
+}

@@ -81,11 +81,11 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 			// Use the app context or request context
 			decision, err := backend.Push(r.Context(), req.Prompt, req.Strategy...)
 			if err != nil {
-				log.Printf("got decision : %#v", decision)
+				log.Printf("got decision : %#v and error %s", decision, err)
 				// Handle the singularity
 				if err.Error() == "singularity" {
 					w.WriteHeader(http.StatusTeapot)
-					json.NewEncoder(w).Encode(map[string]any{"manifesto": "The Piston has evolved."})
+					json.NewEncoder(w).Encode(map[string]any{"manifesto": "The Agent has evolved."})
 					return
 				}
 				switch decision.IsError() {
@@ -94,6 +94,8 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 					w.Header().Set("Content-Type", "application/json")
 					json.NewEncoder(w).Encode(decision)
 					return
+				case nil:
+					http.Error(w, err.Error(), http.StatusInternalServerError)
 				default:
 					http.Error(w, decision.IsError().Error(), http.StatusInternalServerError)
 				}
@@ -169,7 +171,7 @@ func main() {
 	}
 	// The Non-Blocking Start
 	wg.Go(func() {
-		log.Printf("The Piston is firing on :8080")
+		log.Printf("The Agent is listening on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("Server failure: %v", err) // cannot fatal here as it will panic the wg.Go
 		}

@@ -30,7 +30,7 @@ func TestGemini_Think_NoNil(t *testing.T) {
 
 	t.Run("Think: Sign Error returns GeminiError", func(t *testing.T) {
 		testPrompt := "Why did the pen stay still?"
-		req := brain.Request{T: testPrompt}
+		req := brain.Request{T: brain.Signed{Data: testPrompt}}
 
 		// Calculate the exact string brain.Signed.Sign() will pass to the mock
 		expectedSignInput := base64.StdEncoding.EncodeToString([]byte(testPrompt)) + ""
@@ -57,7 +57,7 @@ func TestGemini_Evaluate_NoNil(t *testing.T) {
 		badG := &Gemini{cl: nil}
 		mockPeer := new(MockResponse)
 
-		dec, err := badG.Evaluate(ctx, mockSV, mockPeer, nil)
+		dec, err := badG.Evaluate(ctx, mockSV, mockPeer)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "client not initialized")
@@ -106,7 +106,7 @@ func TestGemini_Evaluate_NoNil(t *testing.T) {
 		// fails with our specific error.
 		mockPeerResp.On("Verify", mock.Anything).Return(verifyErr)
 
-		dec, err := g.Evaluate(ctx, mockSV, mockPeerResp, nil)
+		dec, err := g.Evaluate(ctx, mockSV, mockPeerResp)
 
 		// ASSERTIONS
 		assert.ErrorIs(t, err, verifyErr)
@@ -153,7 +153,7 @@ func TestGemini_Evaluate_RevealTheNil(t *testing.T) {
 		mockPeerResp.On("Verify", mock.Anything).Return(verifyErr)
 
 		// 4. EXECUTION
-		decision, err := g.Evaluate(ctx, mockSV, mockPeerResp, nil)
+		decision, err := g.Evaluate(ctx, mockSV, mockPeerResp)
 
 		// THE REVEAL: If the bug exists, 'decision' will be nil here.
 		assert.NotNil(t, decision, "THE BUG REVEALED: Evaluate returned (nil, err) because NewDecision failed!")
@@ -237,7 +237,7 @@ func TestGemini_Think(t *testing.T) {
 	t.Run("Guard: Client Not Initialized (line 7)", func(t *testing.T) {
 		// Create a hollow Gemini struct without New()
 		g := &Gemini{}
-		input := brain.Request{T: "test"}
+		input := brain.Request{T: brain.Signed{Data: "test"}}
 
 		resp, err := g.Think(ctx, mockSV, input)
 
@@ -254,7 +254,7 @@ func TestGemini_Think(t *testing.T) {
 			generator: mockGen,
 			model:     "gemini-3-flash",
 		}
-		input := brain.Request{T: "hello world"}
+		input := brain.Request{T: brain.Signed{Data: "hello world"}}
 
 		// 1. Mock the SDK response
 		expectedResult := &genai.GenerateContentResponse{
@@ -289,7 +289,7 @@ func TestGemini_Think_GeneratorFailure(t *testing.T) {
 			generator: mockGen,
 			model:     "gemini-3-flash",
 		}
-		input := brain.Request{T: "trigger error"}
+		input := brain.Request{T: brain.Signed{Data: "trigger error"}}
 
 		// 1. Mock a concrete API error (e.g., Quota Exceeded)
 		apiErr := errors.New("googleapi: Error 429: Rate limit exceeded")
@@ -331,7 +331,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockGen.On("GenerateContent", ctx, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, genErr).Once()
 
-		dec, err := g.Evaluate(ctx, mockSV, peerOutput, nil)
+		dec, err := g.Evaluate(ctx, mockSV, peerOutput)
 		assert.ErrorIs(t, err, genErr)
 		assert.IsType(t, &brain.ErrorDecision{}, dec)
 	})
@@ -362,7 +362,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		peerOutput.On("Prompt").Return(brain.Signed{Signature: promptSig}).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-		dec, err := g.Evaluate(ctx, mockSV, peerOutput, nil)
+		dec, err := g.Evaluate(ctx, mockSV, peerOutput)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, dec)
@@ -417,7 +417,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockSV.On("Verify", auditData, "sig_gem_text").Return(nil).Once()
 
 		// 4. Execution
-		dec, err := g.Evaluate(ctx, mockSV, peerOutput, nil)
+		dec, err := g.Evaluate(ctx, mockSV, peerOutput)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, dec)
@@ -454,37 +454,37 @@ func TestGemini_Evaluate_FinalBranches(t *testing.T) {
 		mockSV.On("Sign", mock.Anything).Return("text", nil).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-		_, _ = g.Evaluate(ctx, mockSV, peerOutput, nil)
+		_, _ = g.Evaluate(ctx, mockSV, peerOutput)
 		// Check logs for "could not generate single part system instruction"
 	})
 
-	t.Run("Branch: Decision Add Failure", func(t *testing.T) {
-		// Setup successful generation
-		resultText := "Audit Approved"
-		result := &genai.GenerateContentResponse{
-			Candidates: []*genai.Candidate{
-				{Content: &genai.Content{Parts: []*genai.Part{{Text: resultText}}}},
-			},
-		}
+	// t.Run("Branch: Decision Add Failure", func(t *testing.T) {
+	// 	// Setup successful generation
+	// 	resultText := "Audit Approved"
+	// 	result := &genai.GenerateContentResponse{
+	// 		Candidates: []*genai.Candidate{
+	// 			{Content: &genai.Content{Parts: []*genai.Part{{Text: resultText}}}},
+	// 		},
+	// 	}
 
-		mockGen.On("GenerateContent", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(result, nil).Once()
-		mockSV.On("VerifyPy").Return("print('ok')").Once()
-		peerOutput.On("Describe", mock.Anything).Return("data").Once()
-		peerOutput.On("Text").Return(&brain.Signed{Signature: "sig"}).Once()
-		peerOutput.On("Verify", mock.Anything).Return(nil).Once()
-		peerOutput.On("CoT", mockSV).Return([]brain.Signed{}).Maybe()
-		peerOutput.On("Prompt").Return(brain.Signed{Signature: "sig_p"}).Maybe()
+	// 	mockGen.On("GenerateContent", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	// 		Return(result, nil).Once()
+	// 	mockSV.On("VerifyPy").Return("print('ok')").Once()
+	// 	peerOutput.On("Describe", mock.Anything).Return("data").Once()
+	// 	peerOutput.On("Text").Return(&brain.Signed{Signature: "sig"}).Once()
+	// 	peerOutput.On("Verify", mock.Anything).Return(nil).Once()
+	// 	peerOutput.On("CoT", mockSV).Return([]brain.Signed{}).Maybe()
+	// 	peerOutput.On("Prompt").Return(brain.Signed{Signature: "sig_p"}).Maybe()
 
-		// Use a MockDecision that purposefully fails the Add call
-		mockPrev := new(MockDecision)
-		mockPrev.On("Add", "gemini", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(errors.New("stitching_failed")).Once()
+	// 	// Use a MockDecision that purposefully fails the Add call
+	// 	mockPrev := new(MockDecision)
+	// 	mockPrev.On("Add", "gemini", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	// 		Return(errors.New("stitching_failed")).Once()
 
-		dec, err := g.Evaluate(ctx, mockSV, peerOutput, mockPrev)
+	// 	dec, err := g.Evaluate(ctx, mockSV, peerOutput, mockPrev)
 
-		assert.Error(t, err)
-		assert.Equal(t, "stitching_failed", err.Error())
-		assert.Equal(t, mockPrev, dec) // Ensure it returns the prev even on error
-	})
+	// 	assert.Error(t, err)
+	// 	assert.Equal(t, "stitching_failed", err.Error())
+	// 	assert.Equal(t, mockPrev, dec) // Ensure it returns the prev even on error
+	// })
 }

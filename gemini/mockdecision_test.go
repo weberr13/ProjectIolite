@@ -20,3 +20,11 @@ func (m *MockDecision) Add(s string, c []brain.Signed, t brain.Signed, sv brain.
 }
 func (m *MockDecision) SetError(err error)     {}
 func (m *MockDecision) SetAudits(brain.Audits) {}
+func (m *MockDecision) GetAudits() brain.Audits {
+	return nil
+}
+func (m *MockDecision) ToolRequests() map[string][]brain.Signed  { return nil }
+func (m *MockDecision) ToolResponses() map[string][]brain.Signed { return nil }
+func (*MockDecision) Compose(brain.SignVerifier, brain.Decision) error {
+	return nil
+}

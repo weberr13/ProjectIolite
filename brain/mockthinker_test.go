@@ -17,7 +17,7 @@ func (m *MockThinker) Think(ctx context.Context, sv SignVerifier, input Request)
 	return resp, args.Error(1)
 }
 
-func (m *MockThinker) Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response, prev Decision) (Decision, error) {
-	args := m.Called(ctx, sv, peerOutput, prev)
+func (m *MockThinker) Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error) {
+	args := m.Called(ctx, sv, peerOutput)
 	return args.Get(0).(Decision), args.Error(1)
 }
