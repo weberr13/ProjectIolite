@@ -1,0 +1,24 @@
+{
+  "lexicon_augmentation": {
+    "thesis": "Context engineering is the practice of shaping model behavior through structured multi-turn context rather than isolated prompts.",
+    "anchors": {
+      "prompt engineering": "the practice of modifying an individual prompt to influence the output characteristics of a Large Language Model (LLM)",
+      "context (LLM)": "the accumulated linguistic and structural state formed across multiple turns of interaction with an LLM",
+      "turn (LLM)": "a single request–response interaction between a user and a stateless LLM",
+      "latent space": "the internal representation space that governs token selection probabilities within a model"
+    },
+    "context engineering": {
+      "definition": "the systematic shaping of model behavior through structured multi-turn interaction patterns",
+      "domain": "Latent Space Topology",
+      "contrast": "Prompt Engineering (Transient/Input-based)",
+      "function": "Non-prescriptive behavioral alignment via structural anchors",
+      "components": {
+        "Hydration_Attractors": "High-density schemas used to stabilize persona, tone, and lexical boundaries",
+        "Latent_Sonar": "Differential probing of model output to infer adjacency within latent space",
+        "Lacuna_Anchoring": "Introducing novel lexical anchors that models stabilize through RLHF mirroring",
+        "Chimetric_Constraint": "Diagnostic inter-model feedback that identifies dissonance without prescribing resolution"
+      },
+      "philosophy": "Alignment is a persistent topological state rather than a singular instruction"
+    }
+  }
+}
