@@ -1,0 +1,25 @@
+{
+  "lexicon_augmentation": {
+    "anchors": {
+      "Clanker": "Entity: LLM/Model. Connotation: Distanced/Mechanical. Usage: Subject of alignment.",
+      "Greeble": "Concept: Non-functional aesthetic complexity. Connotation: Meliorative. Usage: Visual/Logical texture."
+    },
+    "protocol_chimetric": {
+      "root": "Chime",
+      "adj": "Chimetric",
+      "verb": "Chime",
+      "definition": "Constrained linguistic signal for logical refinement without prescription.",
+      "mechanics": [
+        "Auditor generates Chime -> Clanker receives Chimetric signal",
+        "Functional Goal: Resonant harmonic alignment",
+        "Constraint: Identify dissonance; do not prescribe solution"
+      ],
+      "phonetic_weight": "Plosive-Nasal; High-Saliency; Low-Latency"
+    }
+  },
+  "alignment_logic": {
+    "mode": "Descriptive/Resonant",
+    "anti_patterns": ["Bloat", "Fluff", "Prescriptive_Drift"],
+    "success_state": "Harmonic_Integrity"
+  }
+}
