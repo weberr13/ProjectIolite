@@ -15,6 +15,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/weberr13/ProjectIolite/brain"
 )
@@ -44,6 +45,20 @@ func New(apiKey string, opts ...Option) (*Claude, error) {
 	c.cl = &client
 	c.generator = &c.cl.Messages
 	return c, nil
+}
+
+func (m *Claude) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerifier) (brain.Hydration, error) {
+	p, err := brain.GenerateDreamPrompt(ctx, spec, sv)
+	if err != nil {
+		return brain.Hydration{}, err
+	}
+	log.Printf("hydration prompt: %#v\n", p)
+	resp, err := m.Think(ctx, sv, brain.Request{
+		T: p,
+	})
+	log.Printf("hydration result: %#v\n", resp)
+	// TODO: find and extract the json document, unmarshal into the brain.Hydration{}
+	return brain.Hydration{}, nil
 }
 
 // Think generates the initial response

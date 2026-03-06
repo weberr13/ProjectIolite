@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-//go:embed examples/*.json
+//go:embed examples/rejection.json
 var StaticAssets embed.FS
 
 // Helper for cryptographic grounding

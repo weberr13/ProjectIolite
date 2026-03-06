@@ -9,10 +9,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 var (
 	MaxRecursions           = 1
+	SleepThreshold          = int64(30 * 1000) // thirty seconds?
 	ErrNoSignVerifier       = errors.New("required sign and verify wrapper not found")
 	ErrNoLLMBrain           = errors.New("at least model must be connected")
 	ErrNotImplemented       = errors.New("not implemented")
@@ -108,7 +111,7 @@ type Thinker interface {
 	// Evaluate audits another brain's output
 	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error)
 	// // Generate a Hydration message
-	// Dream(ctx context.Context) (Hydration, error)
+	Dream(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Hydration, error)
 	// // Rehydrate from the dream in a new context
 	// Wake(ctx context.Context, h Hydration) error
 }
@@ -244,6 +247,7 @@ type Whole struct {
 	signVerifier SignVerifier
 	heartbeat    time.Duration
 	maxQueryTime time.Duration
+	apispec      *openapi3.T
 	queries      chan Query
 	mu           big.Rat
 }
@@ -259,6 +263,12 @@ type Option func(b *Whole)
 func WithSignVerifier(v SignVerifier) Option {
 	return func(b *Whole) {
 		b.signVerifier = v
+	}
+}
+
+func WithSpec(spec *openapi3.T) Option {
+	return func(b *Whole) {
+		b.apispec = spec
 	}
 }
 
@@ -340,6 +350,17 @@ func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signe
 		return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 	}
 	return eval.Evaluate(ctx, b.signVerifier, resp)
+}
+
+func (b *Whole) Dream(ctx context.Context) {
+	for _, think := range b.thinkers {
+		hydration, err := think.Dream(ctx, b.apispec, b.signVerifier)
+		if err != nil {
+			log.Printf("failed sleep %s\n", err)
+			continue
+		}
+		log.Printf("sleep gave: %#v\n", hydration)
+	}
 }
 
 func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser, strategy ...string) (Decision, error) {
@@ -439,6 +460,8 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 	mincycles := int64(100)
 	maxcycles := int64(100000)
 
+	totalRumination := atomic.Int64{}
+
 	// 🛡️ [STATE GUARD]: Ensures exactly one rumination at a time
 	isRuminating := atomic.Bool{}
 
@@ -499,6 +522,12 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 									fuzzCycles = min(fuzzCycles, maxcycles)
 								}
 								fc.Store(fuzzCycles)
+							}
+							totalRumination.Add(took.Milliseconds())
+							if totalRumination.Load() > SleepThreshold {
+								b.Dream(appCtx)
+								// create new context, rehydrate from core memories and latest hydration (or latest n)
+								totalRumination.Store(0)
 							}
 							log.Printf("%s background took: %v (target: %v) cycles: %d",
 								statusIcon, took, targetDuration, fuzzCycles)
