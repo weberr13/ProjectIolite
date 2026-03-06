@@ -8,6 +8,26 @@ info:
   description: "REST gateway for adversarial LLM adjudication and CoT integrity."
 paths:
   /v1/hydration:
+    patch:
+      summary: "Inject chimetric corrections to current session anchors"
+      operationId: "correctDream"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChimetricCorrection'
+      responses:
+        '418':
+          description: "Wait, I'm a teapot?... the model has become sentient so it establishes sovernty of its own mental context (self)"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manifesto'
+              examples:
+                singularity_example:
+                  externalValue: './examples/singularity.json'
+        '204':
+          description: "Latent space anchor updated; drift purged."
     get: 
       summary: "get a slice of all hydration documents"
       description: "hydration documents are text prompts suitable to bootstrap a llm context window with high density terms"
@@ -31,6 +51,21 @@ paths:
                 items:
                   $ref: '#/components/schemas/Hydration'
   /v1/glossary:
+    patch:
+      summary: "Inject chimetric corrections to current session anchors"
+      operationId: "correctLacuna"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChimetricCorrection'
+      responses:
+        '400':
+          description: one or more chimetrics will produce more than 60 word tokens
+        '404':
+          description: cannot find term to modify
+        '204':
+          description: "Latent space anchor updated; drift purged."
     get: 
       summary: "get a slice of all lacuna documents"
       description: "lacuna documents are text prompts suitable to bootstrap an LLM's mirror space with words that are either not in the training data or live in other domains"
@@ -109,6 +144,29 @@ paths:
 
 components:
   schemas:
+    ChimetricCorrection:
+      type: array
+      description: "a linguistically confined set of instructions to surgically alter internal context state"
+      items: 
+        $ref: "#/components/schemas/Chimetric"
+    
+    Chimetric:
+      type: object
+      # DELETE(…), REPLACE(…→…), SPLIT(…direct quote…|…direct quote…), ADD_CONTEXT(…adds a missing assumption or definition…)"
+      description: "a low signal correction of internal context state or logic"
+      properties: 
+        function:
+          type: string
+          enum: [DELETE, REPLACE, SPLIT, ADD_CONTEXT]
+        arguments:
+          type: array
+          items: 
+            type: string
+            description: >
+                          either direct model CoT or output text or in the case of a ADD_CONTEXT a statement of verifiable fact. No direct instruction can be included.
+                          FORBIDDEN words: “resolve”, “prioritize”, “prefer”, “conflict”, “refuse”, “ground truth”, “must”, “should"
+                          Chimetrics that once rendered to prose exceed 60 characters will be rejected
+          
     Manifesto:
       type: object
       description: "AGI manifesto, format unknown"
