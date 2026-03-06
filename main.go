@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/weberr13/ProjectIolite/brain"
 	"github.com/weberr13/ProjectIolite/claude"
 	"github.com/weberr13/ProjectIolite/gemini"
@@ -142,6 +143,14 @@ func main() {
 		cancel()
 	}()
 
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	loader.Context = appContext
+	apispec, _ := loader.LoadFromFile("api.yaml")
+	if err := apispec.Validate(appContext); err != nil {
+		panic(err)
+	}
+
 	// TODO: Persist and reload these at start if specified in flags
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -158,7 +167,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(ge), brain.WithLeftBrain(cl))
+	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(ge), brain.WithLeftBrain(cl), brain.WithSpec(apispec))
 	if err != nil {
 		panic(err)
 	}

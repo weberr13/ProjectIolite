@@ -3,6 +3,7 @@ package brain
 import (
 	"context"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -20,4 +21,8 @@ func (m *MockThinker) Think(ctx context.Context, sv SignVerifier, input Request)
 func (m *MockThinker) Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error) {
 	args := m.Called(ctx, sv, peerOutput)
 	return args.Get(0).(Decision), args.Error(1)
+}
+
+func (*MockThinker) Dream(_ context.Context, _ *openapi3.T, _ SignVerifier) (Hydration, error) {
+	return Hydration{}, nil
 }

@@ -21,7 +21,7 @@ paths:
                 $ref: '#/components/schemas/Manifesto'
               examples:
                 singularity_example:
-                  externalValue: '/examples/singularity.json'
+                  externalValue: './examples/singularity.json'
         '200':
           description: a list of all known hydration messages
           content:
@@ -44,7 +44,7 @@ paths:
                 $ref: '#/components/schemas/Manifesto'
               examples:
                 singularity_example:
-                  externalValue: '/examples/singularity.json'
+                  externalValue: './examples/singularity.json'
         '200':
           description: a list of all known lacunas (custom fixes to lexical gaps in general or domain specific knowledge)
           content:
@@ -84,8 +84,7 @@ paths:
                 $ref: '#/components/schemas/Decision'
               examples:
                 success_example:
-                  # 🛡️ [FORENSIC ANCHOR]: Use externalValue for direct file refs
-                  externalValue: '/examples/6.json'
+                  externalValue: './examples/6.json'
         '409':
           description: "Conflict unresolved..."
           content:
@@ -94,7 +93,7 @@ paths:
                 $ref: '#/components/schemas/Decision'
               examples:
                 rejection_example:
-                  externalValue: '/examples/rejection.json' 
+                  externalValue: './examples/rejection.json' 
         '418':
           description: "Wait, I'm a teapot?..."
           content:
@@ -103,7 +102,8 @@ paths:
                 $ref: '#/components/schemas/Manifesto'
               examples:
                 singularity_example:
-                  externalValue: '/examples/singularity.json'
+                  externalValue: './examples/singularity.json'
+                  
         '504':
           description: "MaxQueryTime exceeded"
 
@@ -112,6 +112,7 @@ components:
     Manifesto:
       type: object
       description: "AGI manifesto, format unknown"
+      nullable: true
     Hydration:
       type: object
       required: [context_origin, active_heuristics, technical_benchmarks, forensic_milestones, philosophical_anchors]
@@ -291,6 +292,7 @@ components:
     
     Decision:
       type: object
+      nullable: true
       description: "The complete adversarial audit manifest."
       properties:
         ChainOfThoughts:
