@@ -77,18 +77,24 @@ func New(ctx context.Context, apikey string, opts ...Option) (*Gemini, error) {
 	return g, nil
 }
 
-func (m *Gemini) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerifier) (brain.Hydration, error) {
+func (m *Gemini) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerifier) ([]brain.SignedHydration, error) {
 	p, err := brain.GenerateDreamPrompt(ctx, spec, sv)
 	if err != nil {
-		return brain.Hydration{}, err
+		return nil, err
 	}
 	log.Printf("hydration prompt: %#v\n", p)
 	resp, err := m.Think(ctx, sv, brain.Request{
 		T: p,
 	})
 	log.Printf("hydration result: %#v\n", resp)
-	// TODO: find and extract the json document, unmarshal into the brain.Hydration{}
-	return brain.Hydration{}, nil
+	return brain.ParseDreamResponse(ctx, spec, sv, resp.Text().Data)
+}
+
+func (m *Gemini) Wake(ctx context.Context, sv brain.SignVerifier, h brain.SignedHydration) error {
+	// verify the signature of the Hydration
+	// generate a Wake prompt
+	// Think the prompt, parse
+	return nil
 }
 
 func (g *Gemini) genConfig() *genai.GenerateContentConfig {

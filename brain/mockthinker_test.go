@@ -23,6 +23,10 @@ func (m *MockThinker) Evaluate(ctx context.Context, sv SignVerifier, peerOutput 
 	return args.Get(0).(Decision), args.Error(1)
 }
 
-func (*MockThinker) Dream(_ context.Context, _ *openapi3.T, _ SignVerifier) (Hydration, error) {
-	return Hydration{}, nil
+func (*MockThinker) Dream(_ context.Context, _ *openapi3.T, _ SignVerifier) ([]SignedHydration, error) {
+	return nil, nil
+}
+
+func (*MockThinker) Wake(_ context.Context, _ SignVerifier, _ SignedHydration) error {
+	return nil
 }

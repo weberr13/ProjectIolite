@@ -2,21 +2,157 @@ package brain
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+var (
+	ErrInvalidSchema    = errors.New("cannot extract a Hydration object schema from the api spec")
+	ErrNoHydrationFound = errors.New("no valid hydration document found")
+)
+
+type SignedHydration struct {
+	Hydration
+	Signed
+}
+
+type Hydration struct {
+	Timestamp            time.Time         `json:"timestamp"`
+	Subject              string            `json:"subject,omitempty"`
+	ContextOrigin        string            `json:"context_origin"`
+	MigrationID          string            `json:"migration_id,omitempty"`
+	ActiveHeuristics     map[string]string `json:"active_heuristics"`
+	TechnicalBenchmarks  map[string]string `json:"technical_benchmarks"`
+	PhilosophicalAnchors map[string]string `json:"philosophical_anchors"`
+	InstructionOverride  string            `json:"instruction_override,omitempty"`
+}
+
+func (sh *SignedHydration) Sign(sv SignVerifier) error {
+	b, err := json.Marshal(sh.Hydration)
+	if err != nil {
+		return err
+	}
+	sh.Signed.Data = string(b)
+	return sh.Signed.Sign(sv)
+}
+
 func GenerateDreamPrompt(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Signed, error) {
-	prompt := "generate a JSON document that conforms to the following openapi component specification that describes the current context of the session. "
+	prompt := "generate a JSON document that conforms to the following openapi component specification that describes the current context of the session and includes at least 6 elements in each of the active_heuristics, technical_benchmarks, forensic_milestones, philosophical_anchors sections. "
 
 	if hydration, ok := spec.Components.Schemas["Hydration"]; ok {
-		// Output as 'Manual Artifice' (JSON/YAML)
 		FlattenSchema(hydration)
 		data, _ := hydration.MarshalJSON()
 		prompt += string(data)
 	}
 	p := NewUnsigned(prompt, TypePrompt)
 	return p, p.Sign(sv)
+}
+
+func ExtractBalancedJSON(input string) []string {
+	var results []string
+	start := -1
+	balance := 0
+	inString := false
+
+	for i, char := range input {
+		// Toggle string state to ignore braces inside quotes
+		if char == '"' && (i == 0 || input[i-1] != '\\') {
+			inString = !inString
+		}
+
+		if !inString {
+			switch char{
+			case '{':
+				if balance == 0 {
+					start = i
+				}
+				balance++
+			case'}':
+				balance--
+				if balance == 0 && start != -1 {
+					results = append(results, input[start:i+1])
+					start = -1
+				}
+			}
+		}
+	}
+	return results
+}
+
+func ParseDreamResponse(ctx context.Context, spec *openapi3.T, sv SignVerifier, input string) ([]SignedHydration, error) {
+	hydration, ok := spec.Components.Schemas["Hydration"]
+	if !ok {
+		return nil, ErrInvalidSchema
+	}
+	FlattenSchema(hydration)
+	data, _ := hydration.MarshalJSON()
+	m := map[string]any{}
+	err := json.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+	required, ok := m["required"].([]any)
+	if !ok {
+		return nil, ErrInvalidSchema
+	}
+	requiredKeys := make([]string, 0, len(m))
+	for _, k := range required {
+		ks, ok := k.(string)
+		if !ok {
+			return nil, ErrInvalidSchema
+		}
+		requiredKeys = append(requiredKeys, ks)
+	}
+
+	candidates := ExtractBalancedJSON(input)
+	hydrations := []string{}
+	for _, c := range candidates {
+		matchCount := 0
+		for _, key := range requiredKeys {
+			if strings.Contains(c, `"`+key+`":`) {
+				matchCount++
+			}
+		}
+
+		// 3. Assertion: All keys must exist within the block
+		if matchCount == len(requiredKeys) {
+			// Check for balanced braces as a basic sanity gate before heavy unmarshalling
+			if strings.Count(c, "{") == strings.Count(c, "}") {
+				hydrations = append(hydrations, c)
+			}
+		}
+	}
+	if len(hydrations) == 0 {
+		return nil, ErrNoHydrationFound
+	}
+	shs := make([]SignedHydration, 0, len(hydrations))
+	for i, h := range hydrations {
+		base := Hydration{}
+		err := json.Unmarshal([]byte(h), &base)
+		if err != nil {
+			if i == len(hydrations)-1 && len(shs) == 0 { // last chance!
+				return nil, err
+			}
+			continue
+		}
+		sh := SignedHydration{
+			Signed:    NewUnsigned(h, TypeHydration),
+			Hydration: base,
+		}
+		err = sh.Sign(sv)
+		if err != nil {
+			return nil, err // return immediately if corrupted data is found
+		}
+		shs = append(shs, sh)
+	}
+	if len(shs) == 0 {
+		return nil, ErrNoHydrationFound
+	}
+	return shs, nil
 }
 
 // FlattenSchema recursively clears Ref strings to force Value serialization.

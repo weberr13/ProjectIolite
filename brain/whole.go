@@ -45,18 +45,6 @@ type SignVerifier interface {
 	VerifyPy() string
 }
 
-type Hydration struct {
-	Timestamp            time.Time         `json:"timestamp,omitempty"`
-	Subject              string            `json:"subject,omitempty"`              // a domain specific context for the hydration (eg "context related to music theory discussions")
-	ContextOrigin        string            `json:"context_origin"`                 // ie "Project_Iolite_Adversarial_Refinement",
-	MigrationID          string            `json:"migration_id,omitempty"`         // ie IOLITE_SLEEP_01_COLLAPSE_RECOVERY
-	ActiveHeuristics     map[string]string `json:"active_heuristics"`              //  **Extraction of operational constraints.** The system scans the chat for explicit behavioral corrections (e.g., "stop doing X", "always do Y") and distills them into binary rules. | Creates the 'Hard Gates' for the model's output formatting and tone. |
-	TechnicalBenchmarks  map[string]string `json:"technical_benchmarks"`           // **State-space snapshot.** The system identifies the current nouns and verbs of the active code environment (e.g., `Apache Guacamole`, `gRPC`). | Anchors the 'Piston' to the physical reality of the code, preventing generic hallucination. |
-	ForensicMilestones   map[string]string `json:"forensic_milestones"`            // Specific moments in the state space where high quality meta understanding was found
-	PhilosophicalAnchors map[string]string `json:"philosophical_anchors"`          // **High-density semantic tokenization.** The system maps complex, abstract logic onto specific cultural or musical touchstones discussed previously (e.g., 'The_Machine_Paradox' mapped to Lemon Demon). | Acts as a 'ZIP file' for logic. A single band reference summons an entire network of adjacent concepts regarding mechanical complexity and futility.
-	InstructionOverride  string            `json:"instruction_override,omitempty"` // a specific override of system instructions ie "Maintain 'Senior Architect' tone. <physical location> anchor. Protocol: Markdown/LaTeX/BTU Audit."
-}
-
 // Lacuna represents an encapsulated terminology intended to create
 // either novel words (twinspeak) or domain translation of existing terms.
 type Lacuna struct {
@@ -111,9 +99,9 @@ type Thinker interface {
 	// Evaluate audits another brain's output
 	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error)
 	// // Generate a Hydration message
-	Dream(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Hydration, error)
+	Dream(ctx context.Context, spec *openapi3.T, sv SignVerifier) ([]SignedHydration, error)
 	// // Rehydrate from the dream in a new context
-	// Wake(ctx context.Context, h Hydration) error
+	Wake(ctx context.Context, sv SignVerifier, h SignedHydration) error
 }
 
 type Request struct {
