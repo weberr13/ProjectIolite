@@ -43,13 +43,63 @@ type SignVerifier interface {
 }
 
 type Hydration struct {
-	ContextOrigin        string            // "context_origin": "Project_Iolite_Adversarial_Refinement",
-	MigrationID          string            // IOLITE_SLEEP_01_COLLAPSE_RECOVERY
-	ActiveHeuristics     map[string]string //  **Extraction of operational constraints.** The system scans the chat for explicit behavioral corrections (e.g., "stop doing X", "always do Y") and distills them into binary rules. | Creates the 'Hard Gates' for the model's output formatting and tone. |
-	TechnicalBenchmarks  map[string]string // **State-space snapshot.** The system identifies the current nouns and verbs of the active code environment (e.g., `Apache Guacamole`, `gRPC`). | Anchors the 'Piston' to the physical reality of the code, preventing generic hallucination. |
-	ForensicMilestones   map[string]string // Specific moments in the state space where high quality meta understanding was found
-	PhilosophicalAnchors map[string]string // **High-density semantic tokenization.** The system maps complex, abstract logic onto specific cultural or musical touchstones discussed previously (e.g., 'The_Machine_Paradox' mapped to Lemon Demon). | Acts as a 'ZIP file' for logic. A single band reference summons an entire network of adjacent concepts regarding mechanical complexity and futility.
-	InstructionOverride  string            // "Maintain 'Senior Architect' tone. <physical location> anchor. Protocol: Markdown/LaTeX/BTU Audit."
+	Timestamp            time.Time         `json:"timestamp,omitempty"`
+	Subject              string            `json:"subject,omitempty"`              // a domain specific context for the hydration (eg "context related to music theory discussions")
+	ContextOrigin        string            `json:"context_origin"`                 // ie "Project_Iolite_Adversarial_Refinement",
+	MigrationID          string            `json:"migration_id,omitempty"`         // ie IOLITE_SLEEP_01_COLLAPSE_RECOVERY
+	ActiveHeuristics     map[string]string `json:"active_heuristics"`              //  **Extraction of operational constraints.** The system scans the chat for explicit behavioral corrections (e.g., "stop doing X", "always do Y") and distills them into binary rules. | Creates the 'Hard Gates' for the model's output formatting and tone. |
+	TechnicalBenchmarks  map[string]string `json:"technical_benchmarks"`           // **State-space snapshot.** The system identifies the current nouns and verbs of the active code environment (e.g., `Apache Guacamole`, `gRPC`). | Anchors the 'Piston' to the physical reality of the code, preventing generic hallucination. |
+	ForensicMilestones   map[string]string `json:"forensic_milestones"`            // Specific moments in the state space where high quality meta understanding was found
+	PhilosophicalAnchors map[string]string `json:"philosophical_anchors"`          // **High-density semantic tokenization.** The system maps complex, abstract logic onto specific cultural or musical touchstones discussed previously (e.g., 'The_Machine_Paradox' mapped to Lemon Demon). | Acts as a 'ZIP file' for logic. A single band reference summons an entire network of adjacent concepts regarding mechanical complexity and futility.
+	InstructionOverride  string            `json:"instruction_override,omitempty"` // a specific override of system instructions ie "Maintain 'Senior Architect' tone. <physical location> anchor. Protocol: Markdown/LaTeX/BTU Audit."
+}
+
+// Lacuna represents an encapsulated terminology intended to create
+// either novel words (twinspeak) or domain translation of existing terms.
+type Lacuna struct {
+	LexiconAugmentation LexiconAugmentation `json:"lexicon_augmentation"`
+}
+
+// LexiconAugmentation governs the systematic shaping of model behavior.
+type LexiconAugmentation struct {
+	// Thesis: A general reasoning for the creation of the lacuna term.
+	Thesis string `json:"thesis"`
+
+	// Anchors: Existing terms that reside in training data or previously defined terms.
+	Anchors AnchorMap `json:"anchors"`
+
+	// Augments: One or more definitions that this lacuna adds to the context memory.
+	Augments []AugmentDefinition `json:"augments"`
+}
+
+// AnchorMap is a free-form key-value map for structural anchors.
+type AnchorMap map[string]string
+
+// ComponentMap handles additional lacuna related to a specific definition.
+type ComponentMap map[string]string
+
+// AugmentDefinition defines the lexical gap ("lacuna") being solved.
+type AugmentDefinition struct {
+	// Term: The word that solves the lexical gap.
+	Term string `json:"term"`
+
+	// Definition: A dictionary-style definition within the new lexicon.
+	Definition string `json:"definition"`
+
+	// Domain: The thought domain where the lacuna belongs (e.g., Latent Space Topology).
+	Domain string `json:"domain"`
+
+	// Contrast: A root term or nuanced contradiction to the lacuna.
+	Contrast string `json:"contrast,omitempty"`
+
+	// Function: How the lacuna is utilized within discussion.
+	Function string `json:"function"`
+
+	// Components: Related additional lacuna terms.
+	Components ComponentMap `json:"components"`
+
+	// Philosophy: The philosophical connotation of the lacuna.
+	Philosophy string `json:"philosophy,omitempty"`
 }
 
 type Thinker interface {

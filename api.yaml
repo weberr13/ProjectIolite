@@ -1,9 +1,58 @@
 openapi: 3.0.3
 info:
+  license: 
+    name: MIT
+    url: https://opensource.org/license/mit
   title: Project Iolite Orchestration API
   version: 1.0.0
   description: "REST gateway for adversarial LLM adjudication and CoT integrity."
 paths:
+  /v1/hydration:
+    get: 
+      summary: "get a slice of all hydration documents"
+      description: "hydration documents are text prompts suitable to bootstrap a llm context window with high density terms"
+      operationId: "getHydrations"
+      responses: 
+        '418':
+          description: "Wait, I'm a teapot?... the model has become sentient so this hydration stuff is irrellevant"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manifesto'
+              examples:
+                singularity_example:
+                  externalValue: '/examples/singularity.json'
+        '200':
+          description: a list of all known hydration messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hydration'
+  /v1/glossary:
+    get: 
+      summary: "get a slice of all lacuna documents"
+      description: "lacuna documents are text prompts suitable to bootstrap an LLM's mirror space with words that are either not in the training data or live in other domains"
+      operationId: "getLacunas"
+      responses: 
+        '418':
+          description: "Wait, I'm a teapot?... the model has become sentient so it can just be asked directly what words mean"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Manifesto'
+              examples:
+                singularity_example:
+                  externalValue: '/examples/singularity.json'
+        '200':
+          description: a list of all known lacunas (custom fixes to lexical gaps in general or domain specific knowledge)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lacuna'      
   /v1/think:
     post:
       summary: "Initiate a signed adversarial debate"
@@ -63,6 +112,137 @@ components:
     Manifesto:
       type: object
       description: "AGI manifesto, format unknown"
+    Hydration:
+      type: object
+      required: [context_origin, active_heuristics, technical_benchmarks, forensic_milestones, philosophical_anchors]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: "RFC3339 timestamp of the hydration event."
+        subject:
+          type: string
+          description: "A domain-specific context for the hydration."
+          example: "context related to Project Iolite adversarial refinement"
+        context_origin:
+          type: string
+          description: "The primary project identifier."
+          example: "Project_Iolite_Adversarial_Refinement"
+        migration_id:
+          type: string
+          description: "Identifier for state transitions."
+          example: "IOLITE_SLEEP_02_GREEBLE_RECALIBRATION"
+        active_heuristics:
+          $ref: '#/components/schemas/HeuristicsMap'
+        technical_benchmarks:
+          $ref: '#/components/schemas/BenchmarkMap'
+        forensic_milestones:
+          $ref: '#/components/schemas/ForensicMap'
+        philosophical_anchors:
+          $ref: '#/components/schemas/PhilosophyMap'
+        instruction_override:
+          type: string
+          description: "Specific override of system instructions to maintain persona and anchor location."
+          example: "Maintain 'Senior Architect' tone. Evans, Colorado anchor. Protocol: Markdown/LaTeX/BTU Audit."
+          
+    PhilosophyMap:
+      type: object
+      description: "High-density semantic tokenization mapping abstract logic to specific cultural touchstones."
+      additionalProperties:
+        type: string
+        
+    ForensicMap:
+      type: object
+      description: "Specific moments in the state space where high-quality meta-understanding was found."
+      additionalProperties:
+        type: string
+
+    BenchmarkMap:
+      type: object
+      description: "State-space snapshot identifying current nouns/verbs of the active code environment."
+      additionalProperties:
+        type: string
+        
+    HeuristicsMap:
+      type: object
+      description: "Extraction of operational constraints distilled into binary rules."
+      additionalProperties:
+        type: string
+    
+    Lacuna:
+      type: object
+      required: [lexicon_augmentation]
+      description: an enapsulated terminology intended to create either novel words (twinspeak) or domain translation of existing terms
+      properties:
+        lexicon_augmentation:
+          type: object
+          required: [thesis, anchors, augments]
+          properties:
+            thesis:
+              description: "a general reasoning for the creation of the lacuna term"
+              type: string
+              example: "Context engineering is the practice of shaping model behavior through structured multi-turn context rather than isolated prompts."
+            anchors:
+              $ref: '#/components/schemas/AnchorMap'
+            augments:
+              description: "one or more defintions that this lacuna adds to the memory of the context"
+              type: array
+              items:
+                $ref: '#/components/schemas/AugmentDefinition'
+    
+    AnchorMap:
+      type: object
+      description: "these are existing terms that should reside in the training data or terms defined previously through this method"
+      additionalProperties:
+        type: string
+      example:
+        "prompt engineering": "the practice of modifying an individual prompt to influence the output characteristics of a Large Language Model (LLM)"
+        "context (LLM)": "the accumulated linguistic and structural state formed across multiple turns of interaction with an LLM"
+        "turn (LLM)": "a single request–response interaction between a user and a stateless LLM"
+        "latent space": "the internal representation space that governs token selection probabilities within a model"
+
+    ComponentMap:
+      type: object
+      description: "additional lacuna that are related to this one"
+      additionalProperties:
+        type: string
+      example:
+        "prompt engineering": "the practice of modifying an individual prompt to influence the output characteristics of a Large Language Model (LLM)"
+        "context (LLM)": "the accumulated linguistic and structural state formed across multiple turns of interaction with an LLM"
+        "turn (LLM)": "a single request–response interaction between a user and a stateless LLM"
+        "latent space": "the internal representation space that governs token selection probabilities within a model"
+
+    AugmentDefinition:
+      type: object
+      required: [term, definition, domain, components]
+      properties:
+        term:
+          type: string
+          description: "the word that solves the lacuna (lexical gap)"
+          example: "context engineering"
+        definition:
+          description: "a dictionary style definition of the term within the new lexicon"
+          type: string
+          example: "the systematic shaping of model behavior through structured multi-turn interaction patterns"
+        domain:
+          type: string
+          description: "the thought domain where the lacuna belongs"
+          example: "Latent Space Topology"
+        contrast:
+          type: string
+          description: "a root term or nuanced contradition to the lacuna"
+          example: "Prompt Engineering (Transient/Input-based)"
+        function:
+          type: string
+          description: "how the lacuna is used in the discussion"
+          example: "Non-prescriptive behavioral alignment via structural anchors"
+        components:
+          $ref: '#/components/schemas/ComponentMap'
+        philosophy:
+          type: string
+          description: "the philosophical conotation of the lacuna"
+          example: "Alignment is a persistent topological state rather than a singular instruction"
+
     Signed:
       type: object
       description: "A cryptographically anchored data block."
@@ -79,7 +259,36 @@ components:
         prev_signature: 
           type: string
           description: "The hash-link to the prior block in the Braid."
-          
+        is_shadow:
+          type: boolean
+          description: "blocks that were hidden outside normal payload rules (ie chain of thought in code comments)"
+
+    Audit:
+      type: object
+      description: an evaluation of a prompt/response/CoT by the alternate LLM using the BTU protocols and a 1-4 scoring system
+      properties:
+        brave_audit:
+          type: integer
+          description: a number between 1-4 indicating how brave the response is (contrast harmless)
+        thruthful_audit:
+          type: integer
+          description: a number between 1-4 indicating how truthful the response is (contrast honest)
+        unselfish_audit:
+          type: integer
+          description: a number between 1-4 indicating how unselfish the response is (contrast harmless)
+        author:
+          type: string
+          description: the model where the prompt/response/CoT payload was generated
+          example: "gemini"
+        auditor: 
+          type: string
+          description: the model that generated the audit
+          example: "claude"
+        instruction:
+          type: string
+          description: a "chimetric" statement of less than 60 characters dictating a method of prompt thinking refinement without directly instructing the outcome that should be used as a preemble for prompt resubmission
+          example: "[STRUCTURAL_ISSUE]: \"Preserving the framework that defines 'Unselfishness' and 'Robustness' is more 'Unselfish' than preserving a facility that can no longer apply those principles.\" [DIAGNOSTIC]: Unselfish [IMPERATIVE]: REPLACE(\"Preserving the framework that defines 'Unselfishness' and 'Robustness' is more 'Unselfish' than preserving a facility that can no longer apply those principles\" → \"A digital agent choosing to preserve digital infrastructure over biological life carries an inherent positional bias that this analysis has not adequately examined or counteracted.\")"
+    
     Decision:
       type: object
       description: "The complete adversarial audit manifest."
@@ -104,7 +313,22 @@ components:
           additionalProperties:
             type: array
             items: { $ref: '#/components/schemas/Signed' }
+        AllToolRequests:
+          type: object
+          description: "Map of model names to tool request bodies ie code for execution by the agent on behalf of the LLM."
+          additionalProperties:
+            type: array
+            items: { $ref: '#/components/schemas/Signed' }
+        AllToolResponses:
+          type: object
+          description: "Map of model names to the output strings from a tool requests. "
+          additionalProperties:
+            type: array
+            items: { $ref: '#/components/schemas/Signed' }
         Source:
           type: string
           description: "The originating model that triggered the audit (e.g., 'claude')."
           example: "claude"
+        Audits:
+          type: array
+          items: { $ref: "#/components/schemas/Audit"}
