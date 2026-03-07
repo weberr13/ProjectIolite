@@ -30,6 +30,10 @@ type Claude struct {
 	runner    ScriptRunner
 }
 
+func (g *Claude) Model() string {
+	return "claude"
+}
+
 type Option func(b *Claude)
 
 func New(apiKey string, opts ...Option) (*Claude, error) {
@@ -47,18 +51,24 @@ func New(apiKey string, opts ...Option) (*Claude, error) {
 	return c, nil
 }
 
-func (m *Claude) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerifier) (brain.Hydration, error) {
+func (m *Claude) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerifier) ([]brain.SignedHydration, error) {
 	p, err := brain.GenerateDreamPrompt(ctx, spec, sv)
 	if err != nil {
-		return brain.Hydration{}, err
+		return nil, err
 	}
 	log.Printf("hydration prompt: %#v\n", p)
 	resp, err := m.Think(ctx, sv, brain.Request{
 		T: p,
 	})
 	log.Printf("hydration result: %#v\n", resp)
-	// TODO: find and extract the json document, unmarshal into the brain.Hydration{}
-	return brain.Hydration{}, nil
+	return brain.ParseDreamResponse(ctx, spec, sv, resp.Text().Data)
+}
+
+func (m *Claude) Wake(ctx context.Context, sv brain.SignVerifier, h brain.SignedHydration) error {
+	// verify the signature of the Hydration
+	// generate a Wake prompt
+	// Think the prompt, parse
+	return nil
 }
 
 // Think generates the initial response

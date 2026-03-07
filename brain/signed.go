@@ -15,6 +15,7 @@ const (
 	TypePrompt     BlockType = "prompt"
 	TypeToolCall   BlockType = "tool_request"
 	TypeToolResult BlockType = "tool_response"
+	TypeHydration  BlockType = "hydration"
 )
 
 type CanSignOrVerify interface {
