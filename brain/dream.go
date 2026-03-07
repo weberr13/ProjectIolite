@@ -83,7 +83,7 @@ func ExtractBalancedJSON(input string) []string {
 	return results
 }
 
-func ParseDreamResponse(ctx context.Context, spec *openapi3.T, sv SignVerifier, input string) ([]SignedHydration, error) {
+func ParseDreamResponse(ctx context.Context, spec *openapi3.T, sv SignVerifier, now time.Time, input string) ([]SignedHydration, error) {
 	hydration, ok := spec.Components.Schemas["Hydration"]
 	if !ok {
 		return nil, ErrInvalidSchema
@@ -139,6 +139,7 @@ func ParseDreamResponse(ctx context.Context, spec *openapi3.T, sv SignVerifier, 
 			}
 			continue
 		}
+		base.Timestamp = now.UTC() // LLMs don't undrestand time, these values are hallucinations
 		sh := SignedHydration{
 			Signed:    NewUnsigned(h, TypeHydration),
 			Hydration: base,

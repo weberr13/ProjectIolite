@@ -91,7 +91,7 @@ func (m *Gemini) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerif
 		T: p,
 	})
 	log.Printf("hydration result: %#v\n", resp)
-	return brain.ParseDreamResponse(ctx, spec, sv, resp.Text().Data)
+	return brain.ParseDreamResponse(ctx, spec, sv, time.Now(), resp.Text().Data)
 }
 
 func (m *Gemini) Wake(ctx context.Context, sv brain.SignVerifier, h brain.SignedHydration) error {

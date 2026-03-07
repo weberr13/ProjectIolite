@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
@@ -58,12 +59,15 @@ func TestDreamExtractin(t *testing.T) {
 		err = apispec.Validate(t.Context())
 		assert.NoError(t, err)
 
-		h, err := ParseDreamResponse(t.Context(), apispec, sv, dreamExample)
+		now := time.Now()
+		h, err := ParseDreamResponse(t.Context(), apispec, sv, now, dreamExample)
 		assert.NoError(t, err)
 		hh := Hydration{}
 		assert.NoError(t, json.Unmarshal([]byte(dreamExampleExtracted), &hh))
 		assert.Len(t, h, 1)
 
+		hh.Timestamp = now
+		h[0].Timestamp = now
 		assert.Equal(t, hh, h[0].Hydration)
 		assert.Equal(t, h[0].Signature, "valid123")
 		assert.NotEmpty(t, h[0].Data)
@@ -85,7 +89,7 @@ func FuzzParseDreamResponse(f *testing.F) {
 		// This simulates the LLM injecting garbage before, after, or around the JSON.
 		pathologicalInput := prefix + "\n" + fullResponse + "\n" + suffix
 
-		hydrations, err := ParseDreamResponse(t.Context(), apispec, sv, pathologicalInput)
+		hydrations, err := ParseDreamResponse(t.Context(), apispec, sv, time.Now(), pathologicalInput)
 		if err != nil {
 			if errors.Is(err, ErrNoHydrationFound) || errors.Is(err, ErrInvalidSchema) {
 				return
