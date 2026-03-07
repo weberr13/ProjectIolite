@@ -34,6 +34,10 @@ type Gemini struct {
 	generator ContentGenerator
 }
 
+func (g *Gemini) Model() string {
+	return "gemini" + g.model
+}
+
 type Option func(b *Gemini)
 
 func WithGeminiConfig(cfg *genai.ClientConfig) Option {

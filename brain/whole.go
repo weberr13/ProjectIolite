@@ -2,10 +2,12 @@ package brain
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math/big"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,7 +17,7 @@ import (
 
 var (
 	MaxRecursions           = 1
-	SleepThreshold          = int64(30 * 1000) // thirty seconds?
+	SleepThreshold          = int64(3 * 1000) // 3 seconds total rumination
 	ErrNoSignVerifier       = errors.New("required sign and verify wrapper not found")
 	ErrNoLLMBrain           = errors.New("at least model must be connected")
 	ErrNotImplemented       = errors.New("not implemented")
@@ -102,6 +104,7 @@ type Thinker interface {
 	Dream(ctx context.Context, spec *openapi3.T, sv SignVerifier) ([]SignedHydration, error)
 	// // Rehydrate from the dream in a new context
 	Wake(ctx context.Context, sv SignVerifier, h SignedHydration) error
+	Model() string
 }
 
 type Request struct {
@@ -347,7 +350,24 @@ func (b *Whole) Dream(ctx context.Context) {
 			log.Printf("failed sleep %s\n", err)
 			continue
 		}
+		dreamdir := "./.dreams"
+		now := time.Now()
 		log.Printf("sleep gave: %#v\n", hydration)
+		for _, h := range hydration {
+			b, err := json.Marshal(h)
+			if err != nil {
+				log.Printf("could not marshal hydration document: %s", err)
+				continue
+			}
+			err = os.MkdirAll(dreamdir, 0o700)
+			if err != nil {
+				log.Printf("could not store hydration document: %s", err)
+			}
+			err = os.WriteFile(dreamdir+`/`+think.Model()+now.UTC().Format(time.RFC3339)+`.dream`, b, 0o644)
+			if err != nil {
+				log.Printf("could not store hydration document: %s", err)
+			}
+		}
 	}
 }
 
@@ -467,6 +487,7 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 			}
 		}
 	})
+	prompts := atomic.Int64{}
 	wg.Go(func() {
 		fc := atomic.Int64{}
 		fc.Store(5000)
@@ -512,10 +533,13 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 								fc.Store(fuzzCycles)
 							}
 							totalRumination.Add(took.Milliseconds())
-							if totalRumination.Load() > SleepThreshold {
+							if totalRumination.Load() > SleepThreshold && prompts.Load() > 0 {
 								b.Dream(appCtx)
 								// create new context, rehydrate from core memories and latest hydration (or latest n)
 								totalRumination.Store(0)
+								prompts.Store(0)
+							} else {
+								log.Printf("staying awake for %v < %v\n", totalRumination.Load(), SleepThreshold)
 							}
 							log.Printf("%s background took: %v (target: %v) cycles: %d",
 								statusIcon, took, targetDuration, fuzzCycles)
@@ -532,6 +556,7 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 				}
 			case q := <-b.queries:
 				func(appCtx context.Context, q Query) {
+					defer prompts.Add(1)
 					log.Printf("received query %#v", q)
 					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime)
 					defer cancel()

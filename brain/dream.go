@@ -65,13 +65,13 @@ func ExtractBalancedJSON(input string) []string {
 		}
 
 		if !inString {
-			switch char{
+			switch char {
 			case '{':
 				if balance == 0 {
 					start = i
 				}
 				balance++
-			case'}':
+			case '}':
 				balance--
 				if balance == 0 && start != -1 {
 					results = append(results, input[start:i+1])

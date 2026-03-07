@@ -33,3 +33,6 @@ jwtwrapper/__pycache__/
 # Editor/IDE
 # .idea/
 # .vscode/
+
+.dreams
+.vscode

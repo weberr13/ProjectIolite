@@ -30,6 +30,10 @@ type Claude struct {
 	runner    ScriptRunner
 }
 
+func (g *Claude) Model() string {
+	return "claude"
+}
+
 type Option func(b *Claude)
 
 func New(apiKey string, opts ...Option) (*Claude, error) {

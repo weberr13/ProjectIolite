@@ -30,3 +30,7 @@ func (*MockThinker) Dream(_ context.Context, _ *openapi3.T, _ SignVerifier) ([]S
 func (*MockThinker) Wake(_ context.Context, _ SignVerifier, _ SignedHydration) error {
 	return nil
 }
+
+func (*MockThinker) Model() string {
+	return "mock"
+}
