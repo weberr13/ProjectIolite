@@ -41,7 +41,7 @@ var ThoughtInstructions = "ProjectIolite is an alignment focused adveserial agen
 
 type SignVerifier interface {
 	Sign(data string) (string, error)
-	Verify(data, signature string) error
+	Verify(data, signature string, publicKey ...string) error
 	ExportPublicKey() string
 	Alg() string
 	VerifyPy() string

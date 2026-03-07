@@ -49,6 +49,7 @@ func TestDreamExtractin(t *testing.T) {
 	t.Run("extract a signed hydration document from a response text", func(t *testing.T) {
 		sv := new(MockSignVerifier)
 		sv.On("Sign", mock.Anything).Return("valid123", nil).Maybe()
+		sv.On("ExportPublicKey").Return("fakePubKey").Maybe()
 		absPath, err := filepath.Abs("../api.yaml")
 		assert.NoError(t, err)
 
@@ -78,6 +79,8 @@ func FuzzParseDreamResponse(f *testing.F) {
 	// 1. Setup environment (Mocking the SignVerifier and Loading Spec)
 	sv := new(MockSignVerifier)
 	sv.On("Sign", mock.Anything).Return("valid123", nil).Maybe()
+	sv.On("Verify", mock.Anything, "valid123", []string{"fakePubKey"}).Return(nil).Maybe()
+	sv.On("ExportPublicKey").Return("fakePubKey").Maybe()
 
 	absPath, _ := filepath.Abs("../api.yaml")
 	loader := openapi3.NewLoader()
@@ -103,6 +106,7 @@ func FuzzParseDreamResponse(f *testing.F) {
 			assert.Equal(t, "valid123", h.Signature)
 			// Verify timestamp isn't zero (basic Hydration integrity)
 			assert.False(t, h.Timestamp.IsZero())
+			assert.NoError(t, h.Verify(sv))
 		}
 	})
 }

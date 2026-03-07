@@ -37,6 +37,7 @@ func TestGeminiDecision_New(t *testing.T) {
 		// Signer expectations for the internal d.Sign(sv) call
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 		mockSV.On("Sign", mock.Anything).Return("internal_sig", nil).Maybe()
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
 
 		decision, err := NewBaseDecision("gemini", mockResp, mockSV)
 
@@ -47,6 +48,7 @@ func TestGeminiDecision_New(t *testing.T) {
 
 	t.Run("NewDecision: Sign Failure Returns Nil", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
 		validText := &Signed{Data: "Gemini output", Signature: ""}
 		mockResp := new(MockResponse)
 		mockResp.On("Text").Return(validText).Maybe()
@@ -425,7 +427,7 @@ func TestClaudeDecision_New(t *testing.T) {
 		mockResp.On("Verify", mockSV).Return(nil).Once()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil)
 		mockSV.On("Sign", mock.Anything).Return("fakeSig", nil)
-
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
 		// Sign() will run during NewDecision; gemini blocks must already be signed
 		decision, err := NewBaseDecision("claude", mockResp, mockSV)
 
@@ -465,7 +467,7 @@ func TestClaudeDecision_AddAndStitch(t *testing.T) {
 		mockSV.On("Sign", b64("text 1")+promptSig).Return("sig_text_1", nil).Once()
 		mockSV.On("Verify", b64("text 1")+promptSig, "sig_text_1").Return(nil).Maybe()
 		mockSV.On("Verify", b64("thought 1")+promptSig, "sig_thought").Return(nil).Maybe()
-
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
 		err := d.Add(source, cot, text1, mockSV)
 		assert.NoError(t, err)
 		assert.Len(t, d.AllTexts[source], 1)

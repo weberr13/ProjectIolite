@@ -42,8 +42,16 @@ func (s *SignVerifier) Sign(data string) (string, error) {
 	return s.method.Sign(canonicalData, s.privateKey)
 }
 
-func (s SignVerifier) Verify(data, signature string) error {
-	return s.method.Verify(data, signature, s.publicKey)
+func (s SignVerifier) Verify(data, signature string, publicKey ...string) error {
+	pk := s.publicKey
+	var err error
+	if len(publicKey) > 0 {
+		pk, err = base64.StdEncoding.DecodeString(publicKey[0])
+		if err != nil {
+			return err
+		}
+	}
+	return s.method.Verify(data, signature, pk)
 }
 
 func (s *SignVerifier) ExportPublicKey() string {

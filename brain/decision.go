@@ -15,6 +15,7 @@ type BaseDecision struct {
 	Source           string
 	Audits           Audits
 	e                error
+	PublicKey        string
 }
 
 func (e *BaseDecision) Compose(sv SignVerifier, d Decision) error {
@@ -70,6 +71,7 @@ func NewBaseDecision(source string, init Response, sv SignVerifier) (*BaseDecisi
 		AllTexts:         map[string][]Signed{},
 		AllToolRequests:  map[string][]Signed{},
 		AllToolResponses: map[string][]Signed{},
+		PublicKey:        sv.ExportPublicKey(),
 	}
 
 	tx := init.Text()
@@ -187,8 +189,14 @@ func (d *BaseDecision) Verify(sv SignVerifier) error {
 		if s.Signature == "" {
 			return ErrUnsigned
 		}
-		if err := s.Verify(sv); err != nil {
-			return err
+		if d.PublicKey == "" {
+			if err := s.Verify(sv); err != nil {
+				return err
+			}
+		} else {
+			if err := s.Verify(sv, d.PublicKey); err != nil {
+				return err
+			}
 		}
 
 		// Map the signature to the node for topological lookup

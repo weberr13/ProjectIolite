@@ -341,6 +341,8 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockSV := new(MockSignVerifier)
 		mockSV.On("VerifyPy").Return("print('verify')")
 		mockSV.On("Sign", mock.Anything).Return("sig_gem_audit", nil)
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
+
 		peerOutput := new(MockResponse)
 		peerOutput.On("Text").Return(&brain.Signed{Signature: "peer_sig_123", Data: "hello", PrevSignature: promptSig}).Maybe()
 		peerOutput.On("Describe", mock.Anything).Return("manifest_data")
@@ -415,6 +417,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockSV.On("Sign", auditData).Return("sig_gem_text", nil).Once()
 		// THIS IS THE CALL FROM THE TRACE: Verify the block just signed
 		mockSV.On("Verify", auditData, "sig_gem_text").Return(nil).Once()
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
 
 		// 4. Execution
 		dec, err := g.Evaluate(ctx, mockSV, peerOutput)
@@ -440,6 +443,7 @@ func TestGemini_Evaluate_FinalBranches(t *testing.T) {
 		// This usually requires a mock of a constructor if it were an interface,
 		// but here we can simulate by checking the side effects of an empty VerifyPy return.
 		mockSV.On("VerifyPy").Return("").Once()
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
 
 		// Setup enough for the generator to run
 		mockGen.On("GenerateContent", mock.Anything, mock.Anything, mock.Anything, mock.Anything).

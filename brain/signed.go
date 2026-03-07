@@ -20,7 +20,7 @@ const (
 
 type CanSignOrVerify interface {
 	Sign(data string) (string, error)
-	Verify(data, signature string) error
+	Verify(data, signature string, publicKey ...string) error
 }
 
 type Signed struct {
@@ -63,10 +63,10 @@ func (s *Signed) Sign(sv CanSignOrVerify) error {
 	return nil
 }
 
-func (s *Signed) Verify(sv CanSignOrVerify) error {
+func (s *Signed) Verify(sv CanSignOrVerify, publicKey ...string) error {
 	if s.Signature == "" {
 		return ErrUnsigned
 	}
 	b64Data := base64.StdEncoding.EncodeToString([]byte(s.Data))
-	return sv.Verify(b64Data+s.PrevSignature, s.Signature)
+	return sv.Verify(b64Data+s.PrevSignature, s.Signature, publicKey...)
 }
