@@ -205,6 +205,8 @@ func TestClaude_Evaluate_ToolUseLoop(t *testing.T) {
 		mockSV.On("Sign", "QXVkaXQgUmVzdWx0OiBUaGUgbWF0aCBjaGVja3Mgb3V0LiBBcHByb3ZlZDogdHJ1ZQ==sig_t").Return("valid_sig", nil).Maybe()
 		mockSV.On("Sign", "ZmFpbGVkIHRvIHBhcnNlIHRvb2wgaW5wdXQ6IHVuZXhwZWN0ZWQgZW5kIG9mIEpTT04gaW5wdXQ=sig_p").Return("valid_sig2", nil).Maybe()
 		mockSV.On("Sign", "eyJpZCI6IiIsImlucHV0IjpudWxsLCJuYW1lIjoiIiwidHlwZSI6InRvb2xfdXNlIn0=sig_p").Return("valid_sig3", nil).Maybe()
+		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
+
 		// --- TURN 1: Claude asks to use a tool ---
 		toolID := "tool_123"
 		msg1 := &anthropic.Message{

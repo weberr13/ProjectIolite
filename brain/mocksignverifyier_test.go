@@ -12,14 +12,18 @@ func (m *MockSignVerifier) Sign(data string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockSignVerifier) Verify(data, signature string) error {
+func (m *MockSignVerifier) Verify(data, signature string, publicKey ...string) error {
+	if len(publicKey) > 0 {
+		args := m.Called(data, signature, publicKey)
+		return args.Error(0)
+	}
 	args := m.Called(data, signature)
 	return args.Error(0)
 }
 
 func (m *MockSignVerifier) ExportPublicKey() string {
 	args := m.Called()
-	return args.String()
+	return args.String(0)
 }
 
 func (m *MockSignVerifier) Alg() string {

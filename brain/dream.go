@@ -16,6 +16,7 @@ var (
 )
 
 type SignedHydration struct {
+	PublicKey string
 	Hydration
 	Signed
 }
@@ -37,7 +38,23 @@ func (sh *SignedHydration) Sign(sv SignVerifier) error {
 		return err
 	}
 	sh.Signed.Data = string(b)
+	sh.PublicKey = sv.ExportPublicKey()
 	return sh.Signed.Sign(sv)
+}
+
+func (sh *SignedHydration) Verify(sv SignVerifier) error {
+	if sh.Signature == "" {
+		return ErrUnsigned
+	}
+	b, err := json.Marshal(sh.Hydration)
+	if err != nil {
+		return err
+	}
+	sh.Signed.Data = string(b)
+	if sh.PublicKey != "" {
+		return sv.Verify(sh.Signed.Data+sh.Signed.PrevSignature, sh.Signed.Signature, sh.PublicKey)
+	}
+	return sv.Verify(sh.Signed.Data+sh.Signed.PrevSignature, sh.Signed.Signature)
 }
 
 func GenerateDreamPrompt(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Signed, error) {
