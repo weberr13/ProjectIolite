@@ -2,12 +2,80 @@ package brain
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+func FuzzSanitizeJSON(f *testing.F) {
+	// 1. Seed with known "Greebles"
+	seeds := []string{
+		`{"data": "valid\nnewline"}`,
+		`{"data": "illegal\'quote"}`,
+		`{"data": "nested\\\"quotes"}`,
+		`{"data": "ampersand\&escape"}`,
+		`{"data": "percent\%!(MISSING)greeble"}`,
+	}
+	for _, seed := range seeds {
+		f.Add([]byte(seed))
+	}
+
+	f.Fuzz(func(t *testing.T, input []byte) {
+		wasValid := json.Valid(input)
+		sanitized := SanitizeJSON(input)
+		isNowValid := json.Valid(sanitized)
+
+		if wasValid && !isNowValid {
+			t.Errorf("[REGRESSION]: Sanitizer corrupted valid JSON\nIn: %s\nOut: %s", input, sanitized)
+		}
+
+		for i := 0; i < len(sanitized); i++ {
+			if sanitized[i] == '\\' {
+				if !isJSONValidEscape(sanitized, i) {
+					t.Errorf("[FAILURE]: Illegal escape at index %d: %s", i, sanitized)
+				} else {
+					// JUMP OVER: Skip the escaped character to avoid re-auditing it.
+					if i+1 < len(sanitized) && sanitized[i+1] == 'u' {
+						i += 5 // Skip \uXXXX
+					} else {
+						i++ // Skip \n, \\, \", etc.
+					}
+				}
+			}
+		}
+
+		if !wasValid && isNowValid {
+			t.Logf("[SUCCESS]: Healed invalid JSON into valid format: %s", sanitized)
+		}
+	})
+}
+
+// helper to check if the byte slice contains a valid JSON escape
+func isJSONValidEscape(b []byte, i int) bool {
+	// If it's the last character, it's impossible for it to be a valid escape
+	if i < 0 || i >= len(b)-1 || b[i] != '\\' {
+		return false
+	}
+
+	// Check for \uXXXX (The "Forensic" Unicode escape)
+	if b[i+1] == 'u' {
+		if i+5 >= len(b) {
+			return false
+		} // Truncated \u
+		for j := i + 2; j <= i+5; j++ {
+			if !isHex(b[j]) {
+				return false
+			}
+		}
+		return true
+	}
+
+	return strings.ContainsRune(`"/\bfnrt\`, rune(b[i+1]))
+}
 
 func TestSigned_Flow(t *testing.T) {
 	data := "Universal Genesis Prompt"

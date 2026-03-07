@@ -37,6 +37,8 @@ func TestSchemaRead(t *testing.T) {
 
 		p, err := GenerateDreamPrompt(t.Context(), apispec, sv)
 		assert.NoError(t, err)
+		assert.NotEmpty(t, p.Data64)
+		p.Data64 = ""
 		assert.Equal(t, Signed{
 			Namespace: TypePrompt,
 			Signature: "valid",

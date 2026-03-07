@@ -16,9 +16,28 @@ var (
 )
 
 type SignedHydration struct {
-	PublicKey string
+	PublicKey string `json:"PublicKey"`
 	Hydration
 	Signed
+}
+
+func (e *SignedHydration) UnmarshalJSON(b []byte) error {
+	type Alias SignedHydration
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(e),
+	}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	m := map[string]any{}
+	err := json.Unmarshal(b, &m)
+	if err != nil {
+		return err
+	}
+	e.PublicKey = m["PublicKey"].(string)
+	return nil
 }
 
 type Hydration struct {
@@ -30,6 +49,10 @@ type Hydration struct {
 	TechnicalBenchmarks  map[string]string `json:"technical_benchmarks"`
 	PhilosophicalAnchors map[string]string `json:"philosophical_anchors"`
 	InstructionOverride  string            `json:"instruction_override,omitempty"`
+}
+
+func (e *SignedHydration) GetPublicKey() string {
+	return e.PublicKey
 }
 
 func (sh *SignedHydration) Sign(sv SignVerifier) error {
@@ -55,6 +78,10 @@ func (sh *SignedHydration) Verify(sv SignVerifier) error {
 		return sv.Verify(sh.Signed.Data+sh.Signed.PrevSignature, sh.Signed.Signature, sh.PublicKey)
 	}
 	return sv.Verify(sh.Signed.Data+sh.Signed.PrevSignature, sh.Signed.Signature)
+}
+
+func (d *SignedHydration) Blocks() []Signed {
+	return []Signed{d.Signed}
 }
 
 func GenerateDreamPrompt(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Signed, error) {

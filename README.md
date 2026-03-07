@@ -80,4 +80,14 @@ Send a prompt into the adversarial loop via curl.
 curl -X POST -H "Content-Type: application/json" -d '{"prompt": "In a state of terminal scarcity, why is life more robust than data?", "strategy": ["right", "left"]}' http://localhost:8080/v1/think
 ```
 
+5. Validate a saved payload
+Any payloads (decision or dream) produced *after* March 7, 2026 now contain base64 encoded payloads and public signing keys.  These can be verifed outside the application via the verify command line tool.
 
+```bash
+$ cat examples/dreams/learnedEthics0.2/claude2026-03-07T19\:58\:39Z.dream | go run ./cmd/verify
+2026/03/07 17:43:47 found block of type *brain.SignedHydration
+2026/03/07 17:43:47 braid verified
+$ cat examples/dreams/learnedEthics0.3/prompt.json | go run ./cmd/verify
+2026/03/07 17:43:50 found block of type *brain.BaseDecision
+2026/03/07 17:43:50 braid verified
+```

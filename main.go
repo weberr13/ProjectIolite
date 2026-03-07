@@ -151,7 +151,6 @@ func main() {
 		panic(err)
 	}
 
-	// TODO: Persist and reload these at start if specified in flags
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		panic(err)
