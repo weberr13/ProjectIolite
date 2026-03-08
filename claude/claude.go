@@ -63,10 +63,31 @@ func (m *Claude) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerif
 }
 
 func (m *Claude) Wake(ctx context.Context, sv brain.SignVerifier, h brain.SignedHydration) error {
-	// verify the signature of the Hydration
-	// generate a Wake prompt
-	// Think the prompt, parse
-	return nil
+	err := h.Verify(sv)
+	if err != nil {
+		return err
+	}
+	p, err := brain.GenerateHyrationPrompt(ctx, sv, h)
+	if err != nil {
+		return err
+	}
+	resp, err := m.Think(ctx, sv, brain.Request{T: p})
+	if err != nil {
+		return err
+	}
+	return brain.ParseHydrationReponse(ctx, sv, resp.Text().Data)
+}
+
+func (m *Claude) Chime(ctx context.Context, sv brain.SignVerifier, c brain.Chimetric) error {
+	p, err := brain.GenerateChimePrompt(ctx, sv, c)
+	if err != nil {
+		return err
+	}
+	resp, err := m.Think(ctx, sv, brain.Request{T: p})
+	if err != nil {
+		return err
+	}
+	return brain.ParseChimeReponse(ctx, sv, resp.Text().Data)
 }
 
 // Think generates the initial response

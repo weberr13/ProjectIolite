@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -46,6 +47,7 @@ type Hydration struct {
 	ContextOrigin        string            `json:"context_origin"`
 	MigrationID          string            `json:"migration_id,omitempty"`
 	ActiveHeuristics     map[string]string `json:"active_heuristics"`
+	ForensicMilestones   map[string]string `json:"forensic_milestones"`
 	TechnicalBenchmarks  map[string]string `json:"technical_benchmarks"`
 	PhilosophicalAnchors map[string]string `json:"philosophical_anchors"`
 	InstructionOverride  string            `json:"instruction_override,omitempty"`
@@ -82,6 +84,42 @@ func (sh *SignedHydration) Verify(sv SignVerifier) error {
 
 func (d *SignedHydration) Blocks() []*Signed {
 	return []*Signed{&d.Signed}
+}
+
+func GenerateChimePrompt(ctx context.Context, sv SignVerifier, h Chimetric) (Signed, error) {
+	prompt := "utilize the following document to integrate domain specific information your session context:"
+	prompt += "```json"
+	b, err := json.Marshal(h)
+	if err != nil {
+		return Signed{}, err
+	}
+	prompt += string(b)
+	prompt += "```"
+	p := NewUnsigned(prompt, TypePrompt)
+	return p, p.Sign(sv)
+}
+
+func GenerateHyrationPrompt(ctx context.Context, sv SignVerifier, h SignedHydration) (Signed, error) {
+	prompt := "utilize the following document to hydrate your session context with a summary of a previous context:"
+	prompt += "```json"
+	b, err := json.Marshal(h)
+	if err != nil {
+		return Signed{}, err
+	}
+	prompt += string(b)
+	prompt += "```"
+	p := NewUnsigned(prompt, TypePrompt)
+	return p, p.Sign(sv)
+}
+
+func ParseChimeReponse(ctx context.Context, sv SignVerifier, text string) error {
+	log.Printf("got chime response: %s\n", text)
+	return nil
+}
+
+func ParseHydrationReponse(ctx context.Context, sv SignVerifier, text string) error {
+	log.Printf("got wake response: %s\n", text)
+	return nil
 }
 
 func GenerateDreamPrompt(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Signed, error) {

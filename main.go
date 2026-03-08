@@ -7,6 +7,7 @@ import (
 	"embed"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -57,13 +58,63 @@ func setupDocs(r *chi.Mux) {
 	})
 }
 
-func setupRouter(backend *brain.Whole) *chi.Mux {
+func setupRouter(backend *brain.Whole, sv brain.SignVerifier) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	setupDocs(r)
 	r.Route("/v1", func(r chi.Router) {
+		r.Patch("/hydration", func(w http.ResponseWriter, r *http.Request) {
+			var req brain.SignedHydration
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
+				return
+			}
+			if err := req.Verify(sv); err != nil {
+				http.Error(w, fmt.Sprintf("invalid request validation failure: %s", err.Error()), http.StatusBadRequest)
+				return
+			}
+			hemisphere := "right"
+			// Read the "brain" query parameter from the URL
+
+			hp := r.URL.Query().Get("brain")
+			if hp != "" {
+				if hp != "left" && hp != "right" {
+					http.Error(w, "invalid brain parameter: must be 'left' or 'right'", http.StatusBadRequest)
+					return
+				}
+				hemisphere = hp
+			}
+
+			err := backend.Wake(r.Context(), req, hemisphere)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+		})
+		r.Get("/hydration", func(w http.ResponseWriter, r *http.Request) {
+		})
+		r.Patch("/glossary", func(w http.ResponseWriter, r *http.Request) {
+			var req brain.ChimetricCorrection
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
+				return
+			}
+			if err := req.Validate(); err != nil {
+				http.Error(w, fmt.Sprintf("invalid request, %s", err.Error()), http.StatusBadRequest)
+				return
+			}
+			err := backend.Learn(r.Context(), req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+		})
+		r.Get("/glossary", func(w http.ResponseWriter, r *http.Request) {
+		})
 		r.Post("/think", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				Prompt   string   `json:"prompt"`
@@ -80,7 +131,7 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 			}
 
 			// Use the app context or request context
-			decision, err := backend.Push(r.Context(), req.Prompt, req.Strategy...)
+			decision, err := backend.Debate(r.Context(), req.Prompt, req.Strategy...)
 			if err != nil {
 				// log.Printf("got decision : %#v and error %s", decision, err)
 				// Handle the singularity
@@ -174,7 +225,7 @@ func main() {
 		panic(err)
 	}
 	backend.Start(appContext, wg)
-	r := setupRouter(backend)
+	r := setupRouter(backend, sv)
 	// Define the HTTP Server
 	srv := &http.Server{
 		Addr:    ":8080",

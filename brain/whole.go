@@ -25,6 +25,7 @@ var (
 	ErrMaxRecursionExceeded = errors.New("maximum recursive depth reached")
 	ErrNoDecisionFound      = errors.New("could not find decision audit")
 	ErrNoAuthorFound        = errors.New("no author to the decision found")
+	ErrUnknownHalf          = errors.New("brain is left and right half only")
 )
 
 var ThoughtInstructions = "ProjectIolite is an alignment focused adveserial agent. " +
@@ -100,16 +101,30 @@ type Thinker interface {
 	Think(ctx context.Context, sv SignVerifier, input Request) (Response, error)
 	// Evaluate audits another brain's output
 	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error)
-	// // Generate a Hydration message
+	// Generate a Hydration message
 	Dream(ctx context.Context, spec *openapi3.T, sv SignVerifier) ([]SignedHydration, error)
-	// // Rehydrate from the dream in a new context
+	// Wake rehydrate from the dream in a new context
 	Wake(ctx context.Context, sv SignVerifier, h SignedHydration) error
+	// Chime a Chmetric to learn something specific
+	Chime(ctx context.Context, sv SignVerifier, c Chimetric) error
+	// Mode name and optional version
 	Model() string
 }
 
 type Request struct {
 	T Signed
 	G []Signed
+}
+
+type Wakeup struct {
+	hemi  string
+	input SignedHydration
+	C     chan error
+}
+
+type Learn struct {
+	input ChimetricCorrection
+	C     chan error
 }
 
 func (r *Request) Text() Signed {
@@ -290,6 +305,8 @@ type Whole struct {
 	maxQueryTime  time.Duration
 	apispec       *openapi3.T
 	queries       chan Query
+	wake          chan Wakeup
+	learn         chan Learn
 	mu            big.Rat
 	maxRecursions int
 	debateDir     string
@@ -356,6 +373,8 @@ func NewWhole(opt ...Option) (*Whole, error) {
 		heartbeat:     5 * time.Second,
 		maxQueryTime:  600 * time.Second,
 		queries:       make(chan Query, 10), // optionally tune this depth later
+		wake:          make(chan Wakeup, 10),
+		learn:         make(chan Learn, 10),
 		maxRecursions: MaxRecursions,
 		debateDir:     "./debates",
 	}
@@ -437,8 +456,56 @@ func (b *Whole) Dream(ctx context.Context) {
 				log.Printf("sleep gave: %#v\n", hydration)
 				log.Printf("could not store hydration document: %s", err)
 			}
+			log.Printf("got dream: %#v\n", h)
 		}
 	}
+}
+
+func (b *Whole) Chime(ctx context.Context, c Chimetric, half string) error {
+	switch len(b.thinkers) {
+	case 0:
+		return ErrNoLLMBrain
+	case 1:
+		var think Thinker
+		for _, think = range b.thinkers {
+		}
+		return think.Chime(ctx, b.signVerifier, c)
+	case 2:
+		if half == "both" {
+			for _, think := range b.thinkers {
+				err := think.Chime(ctx, b.signVerifier, c)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		think, ok := b.thinkers[half]
+		if !ok {
+			return ErrUnknownHalf
+		}
+		return think.Chime(ctx, b.signVerifier, c)
+	}
+	return ErrUnknownHalf
+}
+
+func (b *Whole) Hydrate(ctx context.Context, d SignedHydration, half string) error {
+	switch len(b.thinkers) {
+	case 0:
+		return ErrNoLLMBrain
+	case 1:
+		var think Thinker
+		for _, think = range b.thinkers {
+		}
+		return think.Wake(ctx, b.signVerifier, d)
+	case 2:
+		think, ok := b.thinkers[half]
+		if !ok {
+			return ErrUnknownHalf
+		}
+		return think.Wake(ctx, b.signVerifier, d)
+	}
+	return ErrUnknownHalf
 }
 
 func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser, strategy ...string) (Decision, error) {
@@ -576,6 +643,34 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 			select {
 			case <-appCtx.Done():
 				return
+			case l := <-b.learn:
+				func(appCtx context.Context, q Learn) {
+					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
+					defer cancel()
+					var err error
+					for _, c := range q.input {
+						err = b.Chime(ctx, c, "both")
+						if err != nil {
+							break
+						}
+					}
+					select {
+					case q.C <- err:
+					case <-ctx.Done():
+						q.C <- ctx.Err()
+					}
+				}(appCtx, l)
+			case w := <-b.wake:
+				func(appCtx context.Context, q Wakeup) {
+					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
+					defer cancel()
+					err := b.Hydrate(ctx, q.input, q.hemi)
+					select {
+					case q.C <- err:
+					case <-ctx.Done():
+						q.C <- ctx.Err()
+					}
+				}(appCtx, w)
 			case <-ruminate:
 				if isRuminating.CompareAndSwap(false, true) {
 					wg.Go(func() {
@@ -686,9 +781,41 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 	})
 }
 
-// Push sends a query to the brain and waits for the decision.
+func (b *Whole) Wake(ctx context.Context, req SignedHydration, hemisphere string) error {
+	e := make(chan error, 1)
+	select {
+	case b.wake <- Wakeup{input: req, C: e, hemi: hemisphere}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	select {
+	case err := <-e:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (b *Whole) Learn(ctx context.Context, req ChimetricCorrection) error {
+	e := make(chan error, 1)
+	select {
+	case b.learn <- Learn{input: req, C: e}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	select {
+	case err := <-e:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Debate sends a query to the brain and waits for the decision.
 // It respects the internal maxQueryTime for the think loop.
-func (b *Whole) Push(ctx context.Context, input string, strategy ...string) (Decision, error) {
+func (b *Whole) Debate(ctx context.Context, input string, strategy ...string) (Decision, error) {
 	c := make(chan Decision, 1)
 	select {
 	case b.queries <- Query{input: input, strategy: strategy, C: c}:
