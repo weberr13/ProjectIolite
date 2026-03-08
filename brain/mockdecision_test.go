@@ -8,6 +8,10 @@ type MockDecision struct {
 	setErr error
 }
 
+func (m *MockDecision) Clone() Decision {
+	return &MockDecision{Mock: m.Mock, setErr: m.setErr}
+}
+
 func (m *MockDecision) Cots() map[string][][]Signed  { return nil }
 func (m *MockDecision) Prompts() map[string][]Signed { return nil }
 

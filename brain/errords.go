@@ -60,6 +60,10 @@ type ErrorDecision struct {
 	E error
 }
 
+func (e ErrorDecision) Clone() Decision {
+	return &ErrorDecision{E: e.E}
+}
+
 func (e ErrorDecision) Compose(SignVerifier, Decision) error {
 	return e.E
 }

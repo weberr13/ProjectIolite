@@ -2,7 +2,6 @@ package brain
 
 import (
 	"context"
-	"log"
 	"slices"
 	"time"
 )
@@ -46,8 +45,7 @@ func (e *BaseDecision) Compose(sv SignVerifier, d Decision) error {
 	for k := range other {
 		e.AllToolResponses[k] = append(e.AllToolResponses[k], other[k]...)
 	}
-	log.Printf("test Verify: %s", e.Verify(sv))
-	return nil
+	return e.Verify(sv)
 }
 
 func (e *BaseDecision) IsError() error {
