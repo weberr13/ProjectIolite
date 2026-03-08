@@ -8,7 +8,7 @@ type ErrorResponse struct {
 	E error
 }
 
-func (ErrorResponse) CoT(_ SignVerifier) []Signed {
+func (ErrorResponse) CoT(_ SignVerifier, _ ...bool) []Signed {
 	return nil
 }
 
@@ -20,7 +20,11 @@ func (e *ErrorResponse) Text() *Signed {
 	return &Signed{Data: e.E.Error()}
 }
 
-func (e *ErrorResponse) Prompt() Signed {
+func (e *ErrorResponse) Thought(...bool) Signed {
+	return *e.Text()
+}
+
+func (e *ErrorResponse) Prompt(...bool) Signed {
 	return Signed{Data: e.E.Error()}
 }
 

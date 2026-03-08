@@ -70,7 +70,7 @@ go build ./
 Start the local server (default: port 8080).
 
 ```bash
-./ProjectIolite
+./ProjectIolite -recursions=3
 ```
 
 4. INITIATE A 'THINK' REQUEST

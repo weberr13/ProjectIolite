@@ -7,15 +7,30 @@ type BaseResponse struct {
 	e       error
 }
 
-func NewBaseResponse(source string, prompt Signed, genesis ...Signed) *BaseResponse {
-	return &BaseResponse{
+func NewBaseResponse(sv SignVerifier, source string, prompt Signed, genesis ...Signed) (*BaseResponse, error) {
+	r := &BaseResponse{
 		source:  source,
 		prompt:  prompt,
 		genesis: genesis,
 	}
+	if len(r.genesis) > 0 {
+		// Re-sign the prompt, this will be re-keyed to the Genesis
+		r.prompt.PrevSignature = r.GenesisPrompt().Signature
+		r.prompt.Signature = ""
+		err := r.prompt.Sign(sv)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return r, nil
 }
 
-func (r *BaseResponse) Prompt() Signed {
+func (r *BaseResponse) Prompt(quiet ...bool) Signed {
+	if len(quiet) > 0 && quiet[0] {
+		p := r.prompt
+		p.Data64 = ""
+		return p
+	}
 	return r.prompt
 }
 

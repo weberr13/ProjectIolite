@@ -2,7 +2,6 @@ package gemini
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"sync"
@@ -86,11 +85,11 @@ func (m *Gemini) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerif
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("hydration prompt: %#v\n", p)
+	// log.Printf("hydration prompt: %#v\n", p)
 	resp, err := m.Think(ctx, sv, brain.Request{
 		T: p,
 	})
-	log.Printf("hydration result: %#v\n", resp)
+	// log.Printf("hydration result: %#v\n", resp)
 	return brain.ParseDreamResponse(ctx, spec, sv, time.Now(), resp.Text().Data)
 }
 
@@ -139,7 +138,10 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if err != nil {
 		return &GeminiError{e: err}, err
 	}
-	b := brain.NewBaseResponse("gemini", prompt, input.G...)
+	b, err := brain.NewBaseResponse(sv, "gemini", prompt, input.G...)
+	if err != nil {
+		return &GeminiError{e: err}, err
+	}
 	resp := &GeminiResponse{resp: result, model: g.model, BaseResponse: b}
 	err = resp.Sign(sv)
 	return resp, err
@@ -154,7 +156,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if g.cl == nil || g.generator == nil {
 		return &brain.ErrorDecision{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
 	}
-	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
+	// log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
 	cfg := g.genConfig()
 	cfg.Temperature = &HighTemp
 	cfg.ThinkingConfig.ThinkingLevel = genai.ThinkingLevelHigh
@@ -185,16 +187,16 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	} else {
 		log.Printf("could not generate single part system instruction, instead we got %#v", instruction)
 	}
-	s, _ := json.MarshalIndent(cfg, " ", " ")
-	log.Printf("using model instructions: %s", s)
+	// s, _ := json.MarshalIndent(cfg, " ", " ")
+	// log.Printf("using model instructions: %s", s)
 
 	result, err := g.generator.GenerateContent(ctx, "gemini-pro-latest", genai.Text(peerOutput.Describe(sv)), cfg)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
-	s, _ = json.MarshalIndent(result, " ", " ")
-	log.Printf("got result: %s", s)
-	log.Printf("creating new decision struct")
+	// s, _ = json.MarshalIndent(result, " ", " ")
+	// log.Printf("got result: %s", s)
+	// log.Printf("creating new decision struct")
 	prev, err := NewDecision(peerOutput, sv)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
@@ -203,7 +205,8 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	allThoughts := []brain.Signed{}
 	turnThoughts, err := candidatesToThoughts(sv, result, peerOutput.Prompt())
 	if err != nil {
-		return &brain.ErrorDecision{E: err}, err
+		prev.SetError(err)
+		return prev, err
 	}
 	allThoughts = append(allThoughts, turnThoughts...)
 	var textBlock brain.Signed

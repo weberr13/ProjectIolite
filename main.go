@@ -82,7 +82,7 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 			// Use the app context or request context
 			decision, err := backend.Push(r.Context(), req.Prompt, req.Strategy...)
 			if err != nil {
-				log.Printf("got decision : %#v and error %s", decision, err)
+				// log.Printf("got decision : %#v and error %s", decision, err)
 				// Handle the singularity
 				if err.Error() == "singularity" {
 					w.WriteHeader(http.StatusTeapot)
@@ -103,7 +103,7 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 				return
 			}
 			if decision.IsError() != nil {
-				log.Printf("got decision : %#v", decision)
+				// log.Printf("got decision : %#v", decision)
 				switch decision.IsError() {
 				case brain.ErrNoConsensus:
 					w.WriteHeader(http.StatusConflict)
@@ -111,9 +111,11 @@ func setupRouter(backend *brain.Whole) *chi.Mux {
 					json.NewEncoder(w).Encode(decision)
 					return
 				default:
-					http.Error(w, decision.IsError().Error(), http.StatusInternalServerError)
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(decision)
+					return
 				}
-				return
 			}
 
 			w.Header().Set("Content-Type", "application/json")
@@ -128,8 +130,9 @@ func main() {
 	appContext, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	wg := &sync.WaitGroup{}
-
+	maxIter := flag.Int("recursions", brain.MaxRecursions, "the number of iterations permitted in case of an unstable exchange")
 	flag.Parse()
+	iterations := *maxIter
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -166,7 +169,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(ge), brain.WithLeftBrain(cl), brain.WithSpec(apispec))
+	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(ge), brain.WithLeftBrain(cl), brain.WithSpec(apispec), brain.WithMaxIterations(iterations))
 	if err != nil {
 		panic(err)
 	}

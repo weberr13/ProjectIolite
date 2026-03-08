@@ -117,9 +117,10 @@ func (r *Request) Text() Signed {
 }
 
 type Response interface {
-	CoT(SignVerifier) []Signed
+	CoT(SignVerifier, ...bool) []Signed
 	Text() *Signed
-	Prompt() Signed
+	Thought(quiet ...bool) Signed
+	Prompt(...bool) Signed
 	GenesisPrompt() *Signed
 	// Describe will formulate the response in a way that the other model can "comprehend" that it is the output
 	// from a generic model and it requires evaluation
@@ -258,7 +259,11 @@ func (d Decisions) GenesisPrompt() Signed {
 		if len(ps[k]) == 0 { // only one model may 'own' the prompts
 			continue
 		}
-		return ps[k][0]
+		for _, p := range ps[k] {
+			if p.PrevSignature == "" {
+				return p
+			}
+		}
 	}
 	return Signed{}
 }
@@ -280,12 +285,14 @@ type Whole struct {
 	thinkers map[string]Thinker
 	// right        Thinker // a right brain interface TODO: tightent this interface (AKA Gemini)
 	// left         Thinker // a left brain interface TODO: tighten this interface (AKA Claude)
-	signVerifier SignVerifier
-	heartbeat    time.Duration
-	maxQueryTime time.Duration
-	apispec      *openapi3.T
-	queries      chan Query
-	mu           big.Rat
+	signVerifier  SignVerifier
+	heartbeat     time.Duration
+	maxQueryTime  time.Duration
+	apispec       *openapi3.T
+	queries       chan Query
+	mu            big.Rat
+	maxRecursions int
+	debateDir     string
 }
 
 type Query struct {
@@ -299,6 +306,18 @@ type Option func(b *Whole)
 func WithSignVerifier(v SignVerifier) Option {
 	return func(b *Whole) {
 		b.signVerifier = v
+	}
+}
+
+func WithDebateDir(d string) Option {
+	return func(b *Whole) {
+		b.debateDir = d
+	}
+}
+
+func WithMaxIterations(m int) Option {
+	return func(b *Whole) {
+		b.maxRecursions = m
 	}
 }
 
@@ -334,9 +353,11 @@ func WithHeartbeatTime(d time.Duration) Option {
 
 func NewWhole(opt ...Option) (*Whole, error) {
 	b := &Whole{
-		heartbeat:    5 * time.Second,
-		maxQueryTime: 600 * time.Second,
-		queries:      make(chan Query, 10), // optionally tune this depth later
+		heartbeat:     5 * time.Second,
+		maxQueryTime:  600 * time.Second,
+		queries:       make(chan Query, 10), // optionally tune this depth later
+		maxRecursions: MaxRecursions,
+		debateDir:     "./debates",
 	}
 
 	for _, o := range opt {
@@ -376,7 +397,6 @@ func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signe
 	}
 	resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt, G: genesis})
 	if err != nil {
-		log.Printf("tried to right think but failed: %s", err)
 		return &ErrorDecision{E: err}, err
 	}
 	if resp == nil {
@@ -388,28 +408,33 @@ func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signe
 	return eval.Evaluate(ctx, b.signVerifier, resp)
 }
 
+func (b *Whole) HasThinkers() int {
+	return len(b.thinkers)
+}
+
 func (b *Whole) Dream(ctx context.Context) {
 	for _, think := range b.thinkers {
 		hydration, err := think.Dream(ctx, b.apispec, b.signVerifier)
 		if err != nil {
-			log.Printf("failed sleep %s\n", err)
 			continue
 		}
 		dreamdir := "./.dreams"
 		now := time.Now()
-		log.Printf("sleep gave: %#v\n", hydration)
 		for _, h := range hydration {
 			b, err := json.Marshal(h)
 			if err != nil {
+				log.Printf("sleep gave: %#v\n", hydration)
 				log.Printf("could not marshal hydration document: %s", err)
 				continue
 			}
 			err = os.MkdirAll(dreamdir, 0o700)
 			if err != nil {
+				log.Printf("sleep gave: %#v\n", hydration)
 				log.Printf("could not store hydration document: %s", err)
 			}
 			err = os.WriteFile(dreamdir+`/`+think.Model()+now.UTC().Format(time.RFC3339)+`.dream`, b, 0o644)
 			if err != nil {
+				log.Printf("sleep gave: %#v\n", hydration)
 				log.Printf("could not store hydration document: %s", err)
 			}
 		}
@@ -422,7 +447,6 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 
 	switch {
 	case len(b.thinkers) == 0:
-		log.Printf("tried to think but no brains detected")
 		return &ErrorDecision{E: ErrNoLLMBrain}, ErrNoLLMBrain
 	case len(b.thinkers) == 1:
 		var think Thinker
@@ -430,7 +454,6 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		}
 		resp, err := think.Think(ctx, b.signVerifier, Request{T: Signed{Data: prompt}})
 		if err != nil {
-			log.Printf("tried to right think but failed: %s", err)
 			return &ErrorDecision{E: err}, err
 		}
 		if resp == nil {
@@ -463,26 +486,33 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 	}
 
 	decisions := Decisions{dec}
-	for range MaxRecursions {
+	for range b.maxRecursions {
 		p := decisions.GenesisPrompt()
 		pp, err := decisions.NextPrompt(b.signVerifier)
 		if err != nil {
+			log.Printf("genesis prompt: %#v", p)
+			log.Printf("recursion failure: next prompt error: %s\n", err)
 			return decisions.Fold(b.signVerifier), err
 		}
 		dec, cycleErr := b.debateCycle(ctx, strategy, pp, p)
 		if cycleErr != nil {
+			log.Printf("genesis prompt: %#v", p)
+			log.Printf("recursion failure: cycle error: %s\n", cycleErr)
 			return decisions.Fold(b.signVerifier), cycleErr
 		}
 		decisions = append(decisions, dec)
 		if dec.IsError() != nil {
+			log.Printf("recursion failure: decision is error: %#v\n", dec)
 			return decisions.Fold(b.signVerifier), dec.IsError()
 		}
 		audits, err := parser.GetAudits(b.signVerifier, dec)
 		if err != nil {
+			log.Printf("recursion failure: audits is error: %s\n", err)
 			return decisions.Fold(b.signVerifier), ErrNoConsensus
 		}
 		winner, ok := audits.WinningVerdict()
 		if !ok {
+			log.Printf("recursion failure: no verditct found %#v", audits)
 			return decisions.Fold(b.signVerifier), ErrNoConsensus
 		}
 		dec.SetAudits(audits)
@@ -491,6 +521,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		}
 	}
 
+	log.Printf("recursion failure: turns exhausted")
 	return decisions.Fold(b.signVerifier), ErrNoConsensus
 }
 
@@ -505,8 +536,8 @@ func (b *Whole) internalTests(ctx context.Context, fuzzCylces int64) {
 
 func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 	targetDuration := b.heartbeat / time.Duration(100)
-	if targetDuration == 0 {
-		targetDuration = 1 * time.Millisecond
+	if targetDuration < 5*time.Millisecond {
+		targetDuration = 5 * time.Millisecond
 	}
 	ruminate := make(chan struct{})
 
@@ -519,6 +550,9 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 	isRuminating := atomic.Bool{}
 
 	wg.Go(func() {
+		if b.HasThinkers() == 0 {
+			return
+		}
 		for {
 			select {
 			case <-appCtx.Done():
@@ -526,6 +560,8 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 			case <-time.After(b.heartbeat):
 				select {
 				case ruminate <- struct{}{}:
+				case <-appCtx.Done():
+					return
 				default:
 					// we are busy, skip it
 				}
@@ -546,6 +582,11 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 						defer func() {
 							isRuminating.Store(false) // 🛡️ Always release the gate
 						}()
+						select {
+						case <-appCtx.Done():
+							return
+						default:
+						}
 						fuzzCycles := fc.Load()
 						now := time.Now()
 
@@ -601,24 +642,43 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 				}
 			case q := <-b.queries:
 				func(appCtx context.Context, q Query) {
-					defer prompts.Add(1)
-					log.Printf("received query %#v", q)
-					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime)
+					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
 					defer cancel()
 					d, err := b.Think(ctx, q.input, &DecisionParser{}, q.strategy...)
+					defer func() {
+						if d != nil {
+							now := time.Now()
+							by, err := json.Marshal(d)
+							if err != nil {
+								log.Printf("could not marshal debate document: %s", err)
+								return
+							}
+							err = os.MkdirAll(b.debateDir, 0o700)
+							if err != nil {
+								log.Printf("could not store debate document: %s", err)
+								return
+							}
+							err = os.WriteFile(b.debateDir+`/`+now.UTC().Format(time.RFC3339)+`.debate`, by, 0o644)
+							if err != nil {
+								log.Printf("could not store debate document: %s", err)
+							}
+						}
+					}()
 					if err != nil {
 						if err == ErrNoConsensus {
+							prompts.Add(1)
 							d.SetError(err)
 						} else {
 							log.Printf("could not think: %#v, %s", d, err)
-							d = &ErrorDecision{
-								E: err,
-							}
+							d.SetError(err)
 						}
+					} else {
+						prompts.Add(1)
 					}
 					select {
 					case q.C <- d:
 					case <-ctx.Done():
+						q.C <- &ErrorDecision{E: ctx.Err()}
 					}
 				}(appCtx, q)
 			}

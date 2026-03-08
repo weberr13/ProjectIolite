@@ -26,7 +26,7 @@ func (*GeminiError) GenesisPrompt() *brain.Signed {
 	return nil
 }
 
-func (e *GeminiError) CoT(sv brain.SignVerifier) []brain.Signed {
+func (e *GeminiError) CoT(sv brain.SignVerifier, _ ...bool) []brain.Signed {
 	s := brain.NewUnsigned(e.e.Error(), brain.TypeThinking)
 	err := s.Sign(sv)
 	if err != nil {
@@ -50,6 +50,10 @@ func (e *GeminiError) Text() *brain.Signed {
 	return &s
 }
 
+func (e *GeminiError) Thought(...bool) brain.Signed {
+	return *e.Text()
+}
+
 func (e *GeminiError) Describe(sv brain.SignVerifier) string {
 	if e.sig == "" {
 		sig, err := sv.Sign(e.e.Error())
@@ -60,7 +64,7 @@ func (e *GeminiError) Describe(sv brain.SignVerifier) string {
 	return fmt.Sprintf("a critical error occurred and processing could not proceed: %s", e.e.Error())
 }
 
-func (e *GeminiError) Prompt() brain.Signed {
+func (e *GeminiError) Prompt(...bool) brain.Signed {
 	return brain.NewUnsigned(e.input, brain.TypePrompt)
 }
 

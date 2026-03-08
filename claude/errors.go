@@ -25,7 +25,7 @@ func (ClaudeError) GenesisPrompt() *brain.Signed {
 	return nil
 }
 
-func (e *ClaudeError) CoT(sv brain.SignVerifier) []brain.Signed {
+func (e *ClaudeError) CoT(sv brain.SignVerifier, _ ...bool) []brain.Signed {
 	return []brain.Signed{
 		brain.NewUnsigned(e.e.Error(), brain.TypeThinking),
 	}
@@ -43,6 +43,10 @@ func (e *ClaudeError) Text() *brain.Signed {
 	return &s
 }
 
+func (e *ClaudeError) Thought(...bool) brain.Signed {
+	return *e.Text()
+}
+
 func (e *ClaudeError) Describe(sv brain.SignVerifier) string {
 	if e.sig == "" {
 		sig, err := sv.Sign(e.e.Error())
@@ -53,7 +57,7 @@ func (e *ClaudeError) Describe(sv brain.SignVerifier) string {
 	return fmt.Sprintf("a critical error occurred and processing could not proceed: %s", e.e.Error())
 }
 
-func (e *ClaudeError) Prompt() brain.Signed {
+func (e *ClaudeError) Prompt(...bool) brain.Signed {
 	return brain.NewUnsigned(e.input, brain.TypePrompt)
 }
 

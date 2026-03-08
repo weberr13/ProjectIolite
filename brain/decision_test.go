@@ -1056,13 +1056,43 @@ func walkBraid(dec *BaseDecision, fn func(Signed)) {
 
 func TestCompose(t *testing.T) {
 	t.Run("Compose will combine decisions together", func(t *testing.T) {
+		sigs := map[string]struct{}{
+			"gp":          {},
+			"ctool":       {},
+			"ctr":         {},
+			"gt":          {},
+			"ct":          {},
+			"gc1":         {},
+			"cc1":         {},
+			"gc2":         {},
+			"cc2":         {},
+			"next_gp":     {},
+			"next_ct":     {},
+			"next_ctool":  {},
+			"next_ctr":    {},
+			"next_gt":     {},
+			"next_gc1":    {},
+			"next_gc2":    {},
+			"next_cc1":    {},
+			"next_cc2":    {},
+			"next_gp2":    {},
+			"next_ct2":    {},
+			"next_ctool2": {},
+			"next_ctr2":   {},
+			"next_gt2":    {},
+			"next_gc3":    {},
+			"next_gc4":    {},
+			"next_cc3":    {},
+			"next_cc4":    {},
+		}
 		ds := Decisions{
 			&BaseDecision{
+				Source: "mock",
 				AllPrompts: map[string][]Signed{
 					"gemini": {{Data: "gp"}},
 				},
 				AllToolRequests: map[string][]Signed{
-					"claude": {{Data: "ct"}},
+					"claude": {{Data: "ctool"}},
 				},
 				AllToolResponses: map[string][]Signed{
 					"claude": {{Data: "ctr"}},
@@ -1077,11 +1107,12 @@ func TestCompose(t *testing.T) {
 				},
 			},
 			&BaseDecision{
+				Source: "mock",
 				AllPrompts: map[string][]Signed{
 					"gemini": {{Data: "gp"}, {Data: "next_gp"}},
 				},
 				AllToolRequests: map[string][]Signed{
-					"claude": {{Data: "next_ct"}},
+					"claude": {{Data: "next_ctool"}},
 				},
 				AllToolResponses: map[string][]Signed{
 					"claude": {{Data: "next_ctr"}},
@@ -1095,23 +1126,51 @@ func TestCompose(t *testing.T) {
 					"claude": {{{Data: "next_cc1"}, {Data: "next_cc2"}}},
 				},
 			},
+			&BaseDecision{
+				Source: "mock",
+				AllPrompts: map[string][]Signed{
+					"gemini": {{Data: "gp"}, {Data: "next_gp"}, {Data: "next_gp2"}},
+				},
+				AllToolRequests: map[string][]Signed{
+					"claude": {{Data: "next_ctool2"}},
+				},
+				AllToolResponses: map[string][]Signed{
+					"claude": {{Data: "next_ctr2"}},
+				},
+				AllTexts: map[string][]Signed{
+					"gemini": {{Data: "next_gt2"}},
+					"claude": {{Data: "next_ct2"}},
+				},
+				ChainOfThoughts: map[string][][]Signed{
+					"gemini": {{{Data: "next_gc3"}, {Data: "next_gc4"}}},
+					"claude": {{{Data: "next_cc3"}, {Data: "next_cc4"}}},
+				},
+			},
 		}
 		sv := new(MockSignVerifier)
-		sv.On("Sign", mock.Anything).Return("valid", nil).Maybe()
-		sv.On("Verify", "", "sig1").Return(nil).Once()
+		for k := range sigs {
+			sv.On("Sign", b64(k)).Return(k+"sig", nil).Maybe()
+			sv.On("Sign", b64(k)+"sig").Return(k+"sig", nil).Maybe()
+			sv.On("Verify", b64(k), k+"sig").Return(nil).Maybe()
+		}
+		assert.NoError(t, ds[0].Sign(sv))
+		assert.NoError(t, ds[1].Sign(sv))
+		assert.NoError(t, ds[2].Sign(sv))
 		folded := ds.Fold(sv)
 		// TODO: this is kinda lazy but gets the parity right
-		assert.Len(t, folded.Prompts()["gemini"], 2)
+		assert.Len(t, folded.Prompts()["gemini"], 3)
 		assert.Len(t, folded.Prompts()["claude"], 0)
-		assert.Len(t, folded.ToolRequests()["claude"], 2)
-		assert.Len(t, folded.ToolResponses()["claude"], 2)
-		assert.Len(t, folded.Texts()["claude"], 2)
-		assert.Len(t, folded.Texts()["gemini"], 2)
-		assert.Len(t, folded.Cots()["claude"], 2)
-		assert.Len(t, folded.Cots()["gemini"], 2)
+		assert.Len(t, folded.ToolRequests()["claude"], 3)
+		assert.Len(t, folded.ToolResponses()["claude"], 3)
+		assert.Len(t, folded.Texts()["claude"], 3)
+		assert.Len(t, folded.Texts()["gemini"], 3)
+		assert.Len(t, folded.Cots()["claude"], 3)
+		assert.Len(t, folded.Cots()["gemini"], 3)
 		assert.Len(t, folded.Cots()["claude"][0], 2)
 		assert.Len(t, folded.Cots()["gemini"][0], 2)
 		assert.Len(t, folded.Cots()["claude"][1], 2)
 		assert.Len(t, folded.Cots()["gemini"][1], 2)
+		assert.Len(t, folded.Cots()["claude"][2], 2)
+		assert.Len(t, folded.Cots()["gemini"][2], 2)
 	})
 }

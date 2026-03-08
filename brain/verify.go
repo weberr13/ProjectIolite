@@ -17,15 +17,15 @@ var (
 )
 
 type SignedContainer interface {
-	Blocks() []Signed
+	Blocks() []*Signed
 	GetPublicKey() string
 }
 
 func VerifyBraid(ctx context.Context, sv SignVerifier, data SignedContainer) error {
-	allNodes := make(map[string]Signed)
+	allNodes := make(map[string]*Signed)
 	genesisCount := 0
 
-	err := Walk(data.Blocks(), func(s Signed) error {
+	err := Walk(data.Blocks(), func(s *Signed) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -66,7 +66,7 @@ func VerifyBraid(ctx context.Context, sv SignVerifier, data SignedContainer) err
 	}
 	if genesisCount > 1 {
 		log.Printf("🛡️ [BRAID_AUDIT_FAILURE]: Multiple Genesis Nodes Detected")
-		Walk(data.Blocks(), func(s Signed) error {
+		Walk(data.Blocks(), func(s *Signed) error {
 			log.Printf("  -> Namespace: %s | Sig: %s | Prev: %s",
 				s.Namespace, s.Signature, s.PrevSignature)
 			return nil
@@ -107,7 +107,7 @@ func VerifyBraid(ctx context.Context, sv SignVerifier, data SignedContainer) err
 	return nil
 }
 
-func Walk(blocks []Signed, fn func(Signed) error) error {
+func Walk(blocks []*Signed, fn func(*Signed) error) error {
 	for i := range blocks {
 		err := fn(blocks[i])
 		if err != nil {

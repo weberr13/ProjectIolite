@@ -101,7 +101,8 @@ func TestClaudeResponse_Sign(t *testing.T) {
 	t.Run("Sign: Success Path with Prompt Grounding", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
 		prompt := brain.Signed{Data: "system prompt"}
-		b := brain.NewBaseResponse("claude", prompt)
+		b, err := brain.NewBaseResponse(mockSV, "claude", prompt)
+		assert.NoError(t, err)
 		r := &ClaudeResponse{
 			BaseResponse: b,
 			cot: []brain.Signed{
@@ -123,7 +124,7 @@ func TestClaudeResponse_Sign(t *testing.T) {
 		mockSV.On("Sign", b64("final")+"sig_1").Return("sig_2", nil).Once()
 
 		// 3. Execution
-		err := r.Sign(mockSV)
+		err = r.Sign(mockSV)
 
 		// 4. ASSERTIONS
 		assert.NoError(t, err)
@@ -136,7 +137,9 @@ func TestClaudeResponse_Sign(t *testing.T) {
 
 	t.Run("Sign: Fail on CoT Error", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
-		b := brain.NewBaseResponse("claude", brain.Signed{Data: "system"})
+		b, err := brain.NewBaseResponse(mockSV, "claude", brain.Signed{Data: "system"})
+		assert.NoError(t, err)
+
 		r := &ClaudeResponse{
 			BaseResponse: b,
 			cot:          []brain.Signed{{Data: "unlucky thought"}},
@@ -151,7 +154,7 @@ func TestClaudeResponse_Sign(t *testing.T) {
 		// 2. CoT fails (The target branch)
 		mockSV.On("Sign", b64("unlucky thought")+"").Return("", signErr).Once()
 
-		err := r.Sign(mockSV)
+		err = r.Sign(mockSV)
 
 		assert.ErrorIs(t, err, signErr)
 		mockSV.AssertExpectations(t)
@@ -162,29 +165,23 @@ func TestClaudeResponse_Sign_PromptFail(t *testing.T) {
 	t.Run("Sign: Prompt Signing Failure (line 27)", func(t *testing.T) {
 		mockSV := new(MockSignVerifier)
 
-		// 1. Setup a response with a prompt that NEEDS signing
-		// We provide a dummy 'resp' to prevent the lazy-getters from panicking
 		rawJSON := `{"type": "message", "content": [{"type": "text", "text": "final"}]}`
 		var msg anthropic.Message
 		json.Unmarshal([]byte(rawJSON), &msg)
 
-		b := brain.NewBaseResponse("claude", brain.Signed{Data: "critical instructions", Signature: ""})
+		b, err := brain.NewBaseResponse(mockSV, "claude", brain.Signed{Data: "critical instructions", Signature: ""})
+		assert.NoError(t, err)
+
 		r := &ClaudeResponse{
 			BaseResponse: b,
 			resp:         &msg,
 		}
 
-		// 2. EXPECTATION: The very first Sign call fails
 		signErr := errors.New("prompt_locking_failed")
 		mockSV.On("Sign", b64("critical instructions")+"").Return("", signErr).Once()
 
-		// 3. Execution
-		err := r.Sign(mockSV)
-
-		// 4. ASSERTIONS
+		err = r.Sign(mockSV)
 		assert.ErrorIs(t, err, signErr)
-
-		// Final Safety: Ensure we never even tried to sign the CoT or Text
 		mockSV.AssertNotCalled(t, "Sign", b64("final")+"")
 		mockSV.AssertExpectations(t)
 	})

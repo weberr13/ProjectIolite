@@ -11,7 +11,7 @@ go mod tidy
 
 # 2. Standard Logic Verification
 echo "🧪 Running Unit Tests with Race Detection..."
-go test -race ./...
+go test -race -count=1 -timeout=1m ./...
 
 # 3. Mutative Hardening
 echo "🧬 Running Fuzzing Heartbeat (5s)..."
