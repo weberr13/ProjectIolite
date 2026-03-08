@@ -1,9 +1,10 @@
 package brain
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"slices"
+	"time"
 )
 
 type BaseDecision struct {
@@ -16,6 +17,10 @@ type BaseDecision struct {
 	Audits           Audits
 	e                error
 	PublicKey        string
+}
+
+func (e *BaseDecision) GetPublicKey() string {
+	return e.PublicKey
 }
 
 func (e *BaseDecision) Compose(sv SignVerifier, d Decision) error {
@@ -179,134 +184,43 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 	return nil
 }
 
-func (d *BaseDecision) Verify(sv SignVerifier) error {
-	allNodes := make(map[string]Signed)
-	genesisCount := 0
-
-	// 1. [PHYSICAL PASS]: Crypto verification & Collection
-	// We'll use a helper to walk all maps (ChainOfThoughts, AllPrompts, AllTexts)
-	err := d.Walk(func(s Signed) error {
-		if s.Signature == "" {
-			return ErrUnsigned
-		}
-		if d.PublicKey == "" {
-			if err := s.Verify(sv); err != nil {
-				return err
-			}
-		} else {
-			if err := s.Verify(sv, d.PublicKey); err != nil {
-				return err
-			}
-		}
-
-		// Map the signature to the node for topological lookup
-		if _, exists := allNodes[s.Signature]; exists {
-			// This catches duplicate signatures which could confuse the Braid
-			return fmt.Errorf("duplicate signature detected: %v == %v %#v", s, allNodes[s.Signature], d)
-		}
-		allNodes[s.Signature] = s
-
-		if s.PrevSignature == "" {
-			genesisCount++
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	// 2. [TOPOLOGICAL PASS]: Braid Connectivity & Acyclic Check
-	if genesisCount == 0 {
-		return fmt.Errorf("braid failure: no genesis node (prompt) found")
-	}
-	if genesisCount > 1 {
-		log.Printf("🛡️ [BRAID_AUDIT_FAILURE]: Multiple Genesis Nodes Detected")
-		d.Walk(func(s Signed) error {
-			log.Printf("  -> Namespace: %s | Sig: %s | Prev: %s",
-				s.Namespace, s.Signature, s.PrevSignature)
-			return nil
-		})
-		return fmt.Errorf("braid failure: multiple genesis nodes (%d) detected", genesisCount)
-	}
-
-	for sig, node := range allNodes {
-		// Check for self-referencing loops
-		if node.PrevSignature == sig {
-			return fmt.Errorf("circular greeble: node %s points to itself", sig)
-		}
-
-		// Check for orphans (Fully Connected Property)
-		if node.PrevSignature != "" {
-			if _, exists := allNodes[node.PrevSignature]; !exists {
-				return fmt.Errorf("braid insertion detected: node %s points to missing prev_signature %s", sig, node.PrevSignature)
-			}
-		}
-	}
-
-	// 3. [CYCLE DETECTION]: Deep Acyclic Check
-	// This catches A -> B -> A loops
-	for sig := range allNodes {
-		visited := make(map[string]bool)
-		curr := sig
-		for curr != "" {
-			if visited[curr] {
-				return fmt.Errorf("topological failure: infinite rumination loop detected at %s", curr)
-			}
-			visited[curr] = true
-			curr = allNodes[curr].PrevSignature
-		}
-	}
-
-	return nil
-}
-
-// Walk is a 'Unselfish' helper to deduplicate traversal logic
-func (d *BaseDecision) Walk(fn func(Signed) error) error {
-	// Traversal logic for ChainOfThoughts, AllPrompts, and AllTexts...
-	// (Implementation of nested loops as seen in your snippet)
+func (d *BaseDecision) Blocks() []Signed {
+	bs := []Signed{}
 	for k := range d.ChainOfThoughts {
 		for i := range d.ChainOfThoughts[k] {
 			for j := range d.ChainOfThoughts[k][i] {
-				err := fn(d.ChainOfThoughts[k][i][j])
-				if err != nil {
-					return err
-				}
+				bs = append(bs, d.ChainOfThoughts[k][i][j])
 			}
 		}
 	}
 	for k := range d.AllPrompts {
 		for i := range d.AllPrompts[k] {
-			err := fn(d.AllPrompts[k][i])
-			if err != nil {
-				return err
-			}
+			bs = append(bs, d.AllPrompts[k][i])
 		}
 	}
 	for k := range d.AllTexts {
 		for i := range d.AllTexts[k] {
-			err := fn(d.AllTexts[k][i])
-			if err != nil {
-				return err
-			}
+			bs = append(bs, d.AllTexts[k][i])
 		}
 	}
 	for k := range d.AllToolRequests {
 		for i := range d.AllToolRequests[k] {
-			err := fn(d.AllToolRequests[k][i])
-			if err != nil {
-				return err
-			}
+			bs = append(bs, d.AllToolRequests[k][i])
 		}
 	}
 	for k := range d.AllToolResponses {
 		for i := range d.AllToolResponses[k] {
-			err := fn(d.AllToolResponses[k][i])
-			if err != nil {
-				return err
-			}
+			bs = append(bs, d.AllToolResponses[k][i])
 		}
 	}
-	return nil
+	return bs
+}
+
+func (d *BaseDecision) Verify(sv SignVerifier) error {
+	// TODO: inject the app context instead of context.Background
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return VerifyBraid(ctx, sv, d)
 }
 
 func (d *BaseDecision) Cots() map[string][][]Signed {
