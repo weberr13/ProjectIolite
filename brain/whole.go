@@ -117,9 +117,10 @@ func (r *Request) Text() Signed {
 }
 
 type Response interface {
-	CoT(SignVerifier) []Signed
+	CoT(SignVerifier, ...bool) []Signed
 	Text() *Signed
-	Prompt() Signed
+	Thought(quiet ...bool) Signed
+	Prompt(...bool) Signed
 	GenesisPrompt() *Signed
 	// Describe will formulate the response in a way that the other model can "comprehend" that it is the output
 	// from a generic model and it requires evaluation
@@ -487,14 +488,15 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 	decisions := Decisions{dec}
 	for range b.maxRecursions {
 		p := decisions.GenesisPrompt()
-		log.Printf("genesis prompt: %#v", p)
 		pp, err := decisions.NextPrompt(b.signVerifier)
 		if err != nil {
+			log.Printf("genesis prompt: %#v", p)
 			log.Printf("recursion failure: next prompt error: %s\n", err)
 			return decisions.Fold(b.signVerifier), err
 		}
 		dec, cycleErr := b.debateCycle(ctx, strategy, pp, p)
 		if cycleErr != nil {
+			log.Printf("genesis prompt: %#v", p)
 			log.Printf("recursion failure: cycle error: %s\n", cycleErr)
 			return decisions.Fold(b.signVerifier), cycleErr
 		}

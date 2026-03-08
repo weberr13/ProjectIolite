@@ -8,7 +8,7 @@ import (
 // MockResponse is now exported for use in gemini/claude tests
 type MockResponse struct{ mock.Mock }
 
-func (m *MockResponse) CoT(sv brain.SignVerifier) []brain.Signed {
+func (m *MockResponse) CoT(sv brain.SignVerifier, _ ...bool) []brain.Signed {
 	args := m.Called(sv)
 	return args.Get(0).([]brain.Signed)
 }
@@ -22,7 +22,11 @@ func (m *MockResponse) Text() *brain.Signed {
 	return args.Get(0).(*brain.Signed)
 }
 
-func (m *MockResponse) Prompt() brain.Signed {
+func (m *MockResponse) Thought(...bool) brain.Signed {
+	return *m.Text()
+}
+
+func (m *MockResponse) Prompt(...bool) brain.Signed {
 	args := m.Called()
 	return args.Get(0).(brain.Signed)
 }

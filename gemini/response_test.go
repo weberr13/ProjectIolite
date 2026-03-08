@@ -190,7 +190,7 @@ func TestGeminiResponse_Cryptography(t *testing.T) {
 	t.Run("Sign: Prompt Failure", func(t *testing.T) {
 		// Target: Force 'err != nil' on prompt signing
 		b, err := brain.NewBaseResponse(mockSV, "gemini", brain.Signed{Data: "system prompt"})
-				assert.NoError(t, err)
+		assert.NoError(t, err)
 		r := &GeminiResponse{
 			BaseResponse: b,
 			resp:         &genai.GenerateContentResponse{}, // satisfy lazy init

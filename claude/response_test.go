@@ -170,7 +170,7 @@ func TestClaudeResponse_Sign_PromptFail(t *testing.T) {
 		json.Unmarshal([]byte(rawJSON), &msg)
 
 		b, err := brain.NewBaseResponse(mockSV, "claude", brain.Signed{Data: "critical instructions", Signature: ""})
-				assert.NoError(t, err)
+		assert.NoError(t, err)
 
 		r := &ClaudeResponse{
 			BaseResponse: b,

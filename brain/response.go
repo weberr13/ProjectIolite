@@ -25,7 +25,12 @@ func NewBaseResponse(sv SignVerifier, source string, prompt Signed, genesis ...S
 	return r, nil
 }
 
-func (r *BaseResponse) Prompt() Signed {
+func (r *BaseResponse) Prompt(quiet ...bool) Signed {
+	if len(quiet) > 0 && quiet[0] {
+		p := r.prompt
+		p.Data64 = ""
+		return p
+	}
 	return r.prompt
 }
 
