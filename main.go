@@ -128,9 +128,10 @@ func main() {
 	appContext, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	wg := &sync.WaitGroup{}
-
+	maxIter := flag.Int("recursions", brain.MaxRecursions, "the number of iterations permitted in case of an unstable exchange")
 	flag.Parse()
-
+	iterations := *maxIter
+	
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -166,7 +167,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(ge), brain.WithLeftBrain(cl), brain.WithSpec(apispec))
+	backend, err := brain.NewWhole(brain.WithSignVerifier(sv), brain.WithRightBrain(ge), brain.WithLeftBrain(cl), brain.WithSpec(apispec), brain.WithMaxIterations(iterations))
 	if err != nil {
 		panic(err)
 	}

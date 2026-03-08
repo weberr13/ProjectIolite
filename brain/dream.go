@@ -80,8 +80,8 @@ func (sh *SignedHydration) Verify(sv SignVerifier) error {
 	return sv.Verify(sh.Signed.Data+sh.Signed.PrevSignature, sh.Signed.Signature)
 }
 
-func (d *SignedHydration) Blocks() []Signed {
-	return []Signed{d.Signed}
+func (d *SignedHydration) Blocks() []*Signed {
+	return []*Signed{&d.Signed}
 }
 
 func GenerateDreamPrompt(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Signed, error) {

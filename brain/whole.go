@@ -286,6 +286,7 @@ type Whole struct {
 	apispec      *openapi3.T
 	queries      chan Query
 	mu           big.Rat
+	maxRecursions int
 }
 
 type Query struct {
@@ -299,6 +300,12 @@ type Option func(b *Whole)
 func WithSignVerifier(v SignVerifier) Option {
 	return func(b *Whole) {
 		b.signVerifier = v
+	}
+}
+
+func WithMaxIterations(m int) Option {
+	return func(b *Whole) {
+		b.maxRecursions = m
 	}
 }
 
@@ -337,6 +344,7 @@ func NewWhole(opt ...Option) (*Whole, error) {
 		heartbeat:    5 * time.Second,
 		maxQueryTime: 600 * time.Second,
 		queries:      make(chan Query, 10), // optionally tune this depth later
+		maxRecursions: MaxRecursions,
 	}
 
 	for _, o := range opt {
@@ -463,7 +471,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 	}
 
 	decisions := Decisions{dec}
-	for range MaxRecursions {
+	for range b.maxRecursions {
 		p := decisions.GenesisPrompt()
 		pp, err := decisions.NextPrompt(b.signVerifier)
 		if err != nil {
@@ -603,9 +611,29 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 				func(appCtx context.Context, q Query) {
 					defer prompts.Add(1)
 					log.Printf("received query %#v", q)
-					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime)
+					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
 					defer cancel()
 					d, err := b.Think(ctx, q.input, &DecisionParser{}, q.strategy...)
+					defer func() {
+						if d != nil {
+							debateDir := "./.debates"
+							now := time.Now()
+							b, err := json.Marshal(d)
+							if err != nil {
+								log.Printf("could not marshal debate document: %s", err)
+								return
+							}
+							err = os.MkdirAll(debateDir, 0o700)
+							if err != nil {
+								log.Printf("could not store debate document: %s", err)
+								return
+							}
+							err = os.WriteFile(debateDir+`/`+now.UTC().Format(time.RFC3339)+`.debate`, b, 0o644)
+							if err != nil {
+								log.Printf("could not store debate document: %s", err)
+							}
+						}
+					}()
 					if err != nil {
 						if err == ErrNoConsensus {
 							d.SetError(err)
