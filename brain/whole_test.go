@@ -12,7 +12,30 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// --- Mocks for the Orchestrator ---
+func TestFold_Immutability(t *testing.T) {
+	t.Run("Fold mutation test", func(t *testing.T) {
+		original := &BaseDecision{
+			Source: "Anchor",
+			AllTexts: map[string][]Signed{
+				"gemini": {{Data: "Original Content"}},
+			},
+		}
+		contributor := &BaseDecision{
+			Source: "Contributor",
+			AllTexts: map[string][]Signed{
+				"claude": {{Data: "Contribution"}},
+			},
+		}
+		decisions := Decisions{original, contributor}
+		sv := &MockSignVerifier{}
+		folded := decisions.Fold(sv)
+		// We try to mutate the 'folded' result and see if it bleeds back
+		foldedBase := folded.(*BaseDecision)
+		foldedBase.AllTexts["gemini"][0].Data = "MUTATED"
+		assert.NotEqual(t, "MUTATED", original.AllTexts["gemini"][0].Data)
+		assert.Equal(t, "Contribution", contributor.AllTexts["claude"][0].Data, "[FAILURE]: Input preservation failed. Compose mutated the input decision d[1].")
+	})
+}
 
 func TestWhole_Orchestration(t *testing.T) {
 	mockSV := new(MockSignVerifier) // Using the mock from previous turn

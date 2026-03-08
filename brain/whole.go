@@ -144,7 +144,9 @@ type Decision interface {
 	SetError(error)
 	SetAudits(Audits)
 	GetAudits() Audits
+	// Compose must not modify the second argument or Fold will no longer be idempotent
 	Compose(SignVerifier, Decision) error
+	Clone() Decision
 }
 
 type Decisions []Decision
@@ -153,7 +155,7 @@ func (d Decisions) Fold(sv SignVerifier) Decision {
 	if len(d) == 0 {
 		return nil
 	}
-	root := d[0] // TODO: change this to be a deep copy, or we end up losing idempotency of Fold()
+	root := d[0].Clone()
 	var mErr error
 	for i := 1; i < len(d); i++ {
 		err := root.Compose(sv, d[i])
@@ -165,6 +167,49 @@ func (d Decisions) Fold(sv SignVerifier) Decision {
 		root.SetError(mErr)
 	}
 	return root
+}
+
+func (d *BaseDecision) Clone() Decision {
+	newD := &BaseDecision{
+		PublicKey:        d.PublicKey,
+		ChainOfThoughts:  make(map[string][][]Signed),
+		AllPrompts:       make(map[string][]Signed),
+		AllTexts:         make(map[string][]Signed),
+		AllToolRequests:  make(map[string][]Signed),
+		AllToolResponses: make(map[string][]Signed),
+		Source:           d.Source,
+		Audits:           make(Audits, 0, len(d.Audits)),
+	}
+
+	// Deep copy ChainOfThoughts
+	for k, v := range d.ChainOfThoughts {
+		newD.ChainOfThoughts[k] = make([][]Signed, len(v))
+		for i, inner := range v {
+			newD.ChainOfThoughts[k][i] = make([]Signed, len(inner))
+			copy(newD.ChainOfThoughts[k][i], inner)
+		}
+	}
+
+	// Deep copy single-depth slices
+	newD.AllPrompts = cloneMapSlice(d.AllPrompts)
+	newD.AllTexts = cloneMapSlice(d.AllTexts)
+	newD.AllToolRequests = cloneMapSlice(d.AllToolRequests)
+	newD.AllToolResponses = cloneMapSlice(d.AllToolResponses)
+
+	for _, n := range d.Audits {
+		newD.Audits = append(newD.Audits, n) // n is safe to shallow copy
+	}
+	return newD
+}
+
+// Internal unselfish helper to handle the common map[string][]Signed pattern
+func cloneMapSlice(m map[string][]Signed) map[string][]Signed {
+	newM := make(map[string][]Signed)
+	for k, v := range m {
+		newM[k] = make([]Signed, len(v))
+		copy(newM[k], v)
+	}
+	return newM
 }
 
 func (d Decisions) LastAudit() (string, Audit, error) {
