@@ -32,5 +32,5 @@ func (*MockThinker) Wake(_ context.Context, _ SignVerifier, _ SignedHydration) e
 }
 
 func (*MockThinker) Model() string {
-	return "mock"
+	return "testmock"
 }

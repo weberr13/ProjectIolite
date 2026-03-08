@@ -17,7 +17,9 @@ func TestClaudeResponse_Getters(t *testing.T) {
 
 	t.Run("Source: Identity Check", func(t *testing.T) {
 		randstring := uuid.NewString()
-		r := NewBaseResponse(randstring, Signed{})
+		sv := new(MockSignVerifier)
+		r, err := NewBaseResponse(sv, randstring, Signed{})
+		assert.NoError(t, err)
 		assert.Equal(t, randstring, r.Source())
 	})
 }

@@ -2,6 +2,7 @@ package brain
 
 import (
 	"context"
+	"errors"
 	"log"
 	"slices"
 	"time"
@@ -28,26 +29,47 @@ func (e *BaseDecision) Compose(sv SignVerifier, d Decision) error {
 	for k := range otherCoT {
 		e.ChainOfThoughts[k] = append(e.ChainOfThoughts[k], otherCoT[k]...)
 	}
-	other := d.Prompts()
-	for k := range other {
-		if len(other[k]) > 1 {
-			e.AllPrompts[k] = append(e.AllPrompts[k], other[k][1:]...) // first is *always* the genesis prompt
-		}
-	}
-	other = d.Texts()
-	for k := range other {
-		e.AllTexts[k] = append(e.AllTexts[k], other[k]...)
-	}
-	other = d.ToolRequests()
-	for k := range other {
-		e.AllToolRequests[k] = append(e.AllToolRequests[k], other[k]...)
-	}
-	other = d.ToolResponses()
-	for k := range other {
-		e.AllToolResponses[k] = append(e.AllToolResponses[k], other[k]...)
-	}
+	log.Printf("merging prompts\n")
+	e.AllPrompts = mergeSignedSlices(e.AllPrompts, d.Prompts())
+	log.Printf("merging text\n")
+	e.AllTexts = mergeSignedSlices(e.AllTexts, d.Texts())
+	log.Printf("merging tool requests\n")
+	e.AllToolRequests = mergeSignedSlices(e.AllToolRequests, d.ToolRequests())
+	log.Printf("merging tool responses\n")
+	e.AllToolResponses = mergeSignedSlices(e.AllToolResponses, d.ToolResponses())
+	e.Audits = append(e.Audits, d.GetAudits()...)
 	log.Printf("test verify: %s", e.Verify(sv))
 	return nil
+}
+
+// Internal helper to merge slices based on signature parity
+func mergeSignedSlices(existing, incoming map[string][]Signed) map[string][]Signed {
+	for k, exBlocks := range existing {
+		for _, b := range exBlocks {
+			log.Printf("%s existing: %#v\n", k, b)
+		}
+	}
+	for k, inBlocks := range incoming {
+		for _, b := range inBlocks {
+			log.Printf("%s incoming: %#v\n", k, b)
+		}
+	}
+	for k, inBlocks := range incoming {
+		// Create a map of existing signatures for this namespace
+		seen := make(map[string]bool)
+		for _, b := range existing[k] {
+			seen[b.Signature] = true
+		}
+
+		for _, b := range inBlocks {
+			if !seen[b.Signature] {
+				existing[k] = append(existing[k], b)
+			} else {
+				log.Printf("got a block we've already seen?? %#v", b)
+			}
+		}
+	}
+	return existing
 }
 
 func (e *BaseDecision) IsError() error {
@@ -59,6 +81,9 @@ func (e *BaseDecision) SetError(err error) {
 }
 
 func NewBaseDecision(source string, init Response, sv SignVerifier) (*BaseDecision, error) {
+	if source == "mock" {
+		return nil, errors.New("no mock models allowed")
+	}
 	allPrompts := map[string][]Signed{}
 	genesis := init.GenesisPrompt()
 	if genesis != nil {
@@ -88,7 +113,7 @@ func NewBaseDecision(source string, init Response, sv SignVerifier) (*BaseDecisi
 
 func (d *BaseDecision) Sign(sv SignVerifier) error {
 	for k := range d.ChainOfThoughts {
-		if k == d.Source {
+		if k == d.Source || d.Source == "mock" {
 			for i := range d.ChainOfThoughts[k] {
 				for j := range d.ChainOfThoughts[k][i] {
 					if d.ChainOfThoughts[k][i][j].Signature == "" {
@@ -110,7 +135,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		}
 	}
 	for k := range d.AllPrompts {
-		if k == d.Source {
+		if k == d.Source || d.Source == "mock" {
 			for i := range d.AllPrompts[k] {
 				if d.AllPrompts[k][i].Signature == "" {
 					err := d.AllPrompts[k][i].Sign(sv)
@@ -128,7 +153,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		}
 	}
 	for k := range d.AllTexts {
-		if k == d.Source {
+		if k == d.Source || d.Source == "mock" {
 			for i := range d.AllTexts[k] {
 				if d.AllTexts[k][i].Signature == "" {
 					err := d.AllTexts[k][i].Sign(sv)
@@ -146,7 +171,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		}
 	}
 	for k := range d.AllToolRequests {
-		if k == d.Source {
+		if k == d.Source || d.Source == "mock" {
 			for i := range d.AllToolRequests[k] {
 				if d.AllToolRequests[k][i].Signature == "" {
 					err := d.AllToolRequests[k][i].Sign(sv)
@@ -164,7 +189,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		}
 	}
 	for k := range d.AllToolResponses {
-		if k == d.Source {
+		if k == d.Source || d.Source == "mock" {
 			for i := range d.AllToolResponses[k] {
 				if d.AllToolResponses[k][i].Signature == "" {
 					err := d.AllToolResponses[k][i].Sign(sv)

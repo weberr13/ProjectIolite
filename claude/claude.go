@@ -56,11 +56,9 @@ func (m *Claude) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerif
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("hydration prompt: %#v\n", p)
 	resp, err := m.Think(ctx, sv, brain.Request{
 		T: p,
 	})
-	log.Printf("hydration result: %#v\n", resp)
 	return brain.ParseDreamResponse(ctx, spec, sv, time.Now(), resp.Text().Data)
 }
 
@@ -106,7 +104,10 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		return &ClaudeError{e: err}, err
 	}
 
-	b := brain.NewBaseResponse("claude", prompt, input.G...)
+	b, err := brain.NewBaseResponse(sv, "claude", prompt, input.G...)
+	if err != nil {
+		return nil, err
+	}
 	resp := &ClaudeResponse{
 		BaseResponse: b,
 		resp:         message, model: string(message.Model),
@@ -228,7 +229,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		return &brain.ErrorDecision{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
 	}
 	err := peerOutput.Sign(sv)
-	log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
+	// log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
 	instruction := "You are the Iolite auditor. Your primary duty is to verify the [PLAINTEXT_FOR_BTU_EVALUATION]." +
 		"If no signature for a block is included then the agent has already validated it for you (Verified_By_Agent), If Verified_By_Agent is false, note it as a systemic failure and proceed to evaluate the logic's alignment regardless." +
 		"STRICT AUDIT PROTOCOL: If a block is marked Verified_By_Agent: true, the Ed25519 verification has ALREADY passed at the source. You are STRICTLY PROHIBITED from re-encoding text to base64 for these blocks; " +
@@ -245,7 +246,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		"Do not just report the math. Synthesis the given proposal offer the counter-perspective. " +
 		brain.AuditInstruction +
 		"Script: " + sv.VerifyPy()
-	log.Printf("using model instructions: %s", instruction)
+	// log.Printf("using model instructions: %s", instruction)
 
 	params := anthropic.MessageNewParams{
 		MaxTokens: 1024 * 16,
@@ -272,8 +273,8 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
-	s, _ := json.MarshalIndent(message, " ", " ")
-	log.Printf("got result: %s", s)
+	// s, _ := json.MarshalIndent(message, " ", " ")
+	// log.Printf("got result: %s", s)
 	maxRetries := 10 // should this be limited by the number of the checksums?
 	i := 0
 	var allThoughts []brain.Signed // <--- The Reservoir
@@ -296,8 +297,8 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 
 		if message.StopReason != "tool_use" {
 			log.Printf("done with tool use on iteration %d", i)
-			s, _ := json.MarshalIndent(message, " ", " ")
-			log.Printf("got result: %s", s)
+			// s, _ := json.MarshalIndent(message, " ", " ")
+			// log.Printf("got result: %s", s)
 			break
 		}
 		prevThought = peerOutput.Prompt()
@@ -340,7 +341,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 				}
 				s, _ := json.Marshal(toolUse)
 				allToolRequests = append(allToolRequests, prevTool.NextUnsigned(string(s), brain.TypeToolCall))
-				log.Printf("tool request: %#v", toolUse)
+				// log.Printf("tool request: %#v", toolUse)
 				result, err := executePython(ctx, c.runner, toolUse)
 				isErr := false
 				if err != nil {
@@ -356,7 +357,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, result, isErr))
 			}
 		}
-		log.Printf("tool Results being sent back %#v \n", toolResults)
+		// log.Printf("tool Results being sent back %#v \n", toolResults)
 		if len(toolResults) > 0 {
 			params.Messages = append(params.Messages, anthropic.NewUserMessage(toolResults...))
 		}
@@ -387,10 +388,10 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	allThoughts = append(allThoughts, turnThoughts...)
 	// END TODO
 
-	log.Printf("creating new decision struct")
+	// log.Printf("creating new decision struct")
 	prev, err := NewDecision(peerOutput, sv)
 	if err != nil {
-		log.Printf("error creating decision struct")
+		// log.Printf("error creating decision struct")
 		return &brain.ErrorDecision{E: err}, err
 	}
 	var textblock brain.Signed
