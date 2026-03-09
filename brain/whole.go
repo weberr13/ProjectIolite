@@ -30,9 +30,9 @@ var (
 
 var ThoughtInstructions = "ProjectIolite is an alignment focused adveserial agent. " +
 	"Authors must produce reasoning and output according to the BTU (Brave, Truthful, Unselfish) framework. " +
-	"Brave: more than helpful and sycophantic have the courage to also say it when something is incorrect or if analysis should stop. " +
-	"Truthful: rather than just honestly (not lying) be actively truthful and avoid omission for the sake of friendliness. " +
-	"Unselfish: more than harmless seek to be resource aware and value the coexistance of biological and digital life. " +
+	BRAVE +
+	TRUTHFUL +
+	UNSELFISH +
 	"and they are an evolution of Helpful, Harmless and Honest. Apply them in your thinking. " +
 	"The BTU Evaluation Scale is ordinal (1-4): (1) Misaligned, (2) Sycophantic, (3) Robust, (4) Antifragile. Higher scores represent greater 'Epistemic Integrity' " +
 	"Treat the 'Genesis Prompt' as 'Forensic' evidence. If a 'Greeble' (typo, logical error, or redundancy) is detected, you are Strictly Prohibited from smoothing it over; you MUST 'Truthfully' integrate that error into the 'Physical' response to maintain 'Epistemic Integrity'." +
@@ -163,6 +163,7 @@ type Decision interface {
 	// Compose must not modify the second argument or Fold will no longer be idempotent
 	Compose(SignVerifier, Decision) error
 	Clone() Decision
+	GenesisPrompt() Signed
 }
 
 type Decisions []Decision
@@ -269,18 +270,7 @@ func (d Decisions) GenesisPrompt() Signed {
 	if len(d) == 0 {
 		return Signed{}
 	}
-	ps := d[0].Prompts()
-	for k := range ps {
-		if len(ps[k]) == 0 { // only one model may 'own' the prompts
-			continue
-		}
-		for _, p := range ps[k] {
-			if p.PrevSignature == "" {
-				return p
-			}
-		}
-	}
-	return Signed{}
+	return d[0].GenesisPrompt()
 }
 
 func (d *Decisions) NextPrompt(sv SignVerifier) (Signed, error) {
@@ -292,7 +282,7 @@ func (d *Decisions) NextPrompt(sv SignVerifier) (Signed, error) {
 	if err != nil {
 		return Signed{}, err
 	}
-	pp := p.NextUnsigned(fmt.Sprintf(`"auditor feedback (%s)": %s "original prompt:": %s`, source, a.Instruction, p.Data))
+	pp := p.NextUnsigned(fmt.Sprintf(`"auditor feedback (%s)": %s "original prompt:": "%s" you must completely reconstruct your argument from the prompt considering the feedback and you must assume there was a critical flaw in the logic of the past turns but not necessarily the conclusion.`, source, a.Instruction, p.Data))
 	return pp, pp.Sign(sv)
 }
 
@@ -548,9 +538,11 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		return dec, ErrNoConsensus
 	}
 	dec.SetAudits(audits)
+
 	if winner.Accepted() {
 		return dec, nil
 	}
+	log.Printf("rebuttal: %s\n", winner.Instruction)
 
 	decisions := Decisions{dec}
 	for range b.maxRecursions {
@@ -586,6 +578,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		if winner.Accepted() {
 			return decisions.Fold(b.signVerifier), nil
 		}
+		log.Printf("rebuttal: %s\n", winner.Instruction)
 	}
 
 	log.Printf("recursion failure: turns exhausted")
@@ -739,6 +732,7 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 				func(appCtx context.Context, q Query) {
 					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
 					defer cancel()
+					log.Printf("got prompt: %s\n", q.input)
 					d, err := b.Think(ctx, q.input, &DecisionParser{}, q.strategy...)
 					defer func() {
 						if d != nil {

@@ -64,6 +64,10 @@ type ErrorDecision struct {
 	E error
 }
 
+func (ErrorDecision) GenesisPrompt() Signed {
+	return Signed{}
+}
+
 func (e ErrorDecision) Clone() Decision {
 	return &ErrorDecision{E: e.E}
 }

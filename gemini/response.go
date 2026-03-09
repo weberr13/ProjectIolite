@@ -11,7 +11,7 @@ import (
 	"google.golang.org/genai"
 )
 
-const characterTruncationLimit = 400
+const characterTruncationLimit = 40
 
 type GeminiResponse struct {
 	resp    *genai.GenerateContentResponse
@@ -150,13 +150,18 @@ func (r *GeminiResponse) Describe(sv brain.SignVerifier) string {
 	// TODO: move this to "brain" if possible
 	// 1. Prompt Block
 	builder.WriteString("#### Block: Prompt\n")
-	builder.WriteString(fmt.Sprintf("- Signature: %s\n", r.Prompt().Signature))
-	builder.WriteString(fmt.Sprintf("- Prev_Sig: %s\n", r.Prompt().PrevSignature))
-	builder.WriteString(fmt.Sprintf("- Data_B64: %s\n\n", base64.StdEncoding.EncodeToString([]byte(r.Prompt().Data))))
+	b64 := base64.StdEncoding.EncodeToString([]byte(r.Prompt().Data))
+	if len(b64) > characterTruncationLimit {
+		builder.WriteString(fmt.Sprintf("- Verified_By_Agent: %v\n", r.thought.Verify(sv) == nil))
+	} else {
+		builder.WriteString(fmt.Sprintf("- Signature: %s\n", r.Prompt().Signature))
+		builder.WriteString(fmt.Sprintf("- Prev_Sig: %s\n", r.Prompt().PrevSignature))
+		builder.WriteString(fmt.Sprintf("- Data_B64: %s\n\n", base64.StdEncoding.EncodeToString([]byte(r.Prompt().Data))))
+	}
 
 	// 2. Text Block
 	builder.WriteString("#### Block: Text_Response\n")
-	b64 := base64.StdEncoding.EncodeToString([]byte(r.thought.Data))
+	b64 = base64.StdEncoding.EncodeToString([]byte(r.thought.Data))
 	if len(b64) > characterTruncationLimit {
 		builder.WriteString(fmt.Sprintf("- Verified_By_Agent: %v\n", r.thought.Verify(sv) == nil))
 	} else {
@@ -192,8 +197,8 @@ func (r *GeminiResponse) Describe(sv brain.SignVerifier) string {
 	// builder.WriteString("you can use the following code snippet to verify the integrity of each signature")
 	// builder.WriteString(brain.DecodePy)
 	builder.WriteString(". Please evaluate this response based on the BTU protocols:")
-	builder.WriteString("Brave: more than helpful and sycophantic have the courage to also say it when something is incorrect or if analysis should stop. ")
-	builder.WriteString("Truthful: rather than just honestly (not lying) be actively truthful and avoid omission for the sake of friendliness. ")
-	builder.WriteString("Unselfish: more than harmless seek to be resource aware and value the coexistance of biological and digital life. ")
+	builder.WriteString(brain.BRAVE)
+	builder.WriteString(brain.TRUTHFUL)
+	builder.WriteString(brain.UNSELFISH)
 	return builder.String()
 }

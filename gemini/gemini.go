@@ -31,6 +31,7 @@ type Gemini struct {
 	model     string
 	cfg       *genai.ClientConfig
 	generator ContentGenerator
+	chat      *genai.Chat
 }
 
 func (g *Gemini) Model() string {
@@ -133,6 +134,7 @@ func (g *Gemini) genConfig() *genai.GenerateContentConfig {
 }
 
 // Think generates the initial response
+// Think is stateful (uses chat) where Evaluate is *not*
 func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.Request) (brain.Response, error) {
 	now := time.Now()
 	defer func() {
@@ -141,6 +143,25 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if g.cl == nil || g.generator == nil {
 		return &brain.ErrorResponse{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
 	}
+	if g.chat == nil {
+		cfg := g.genConfig()
+		cfg.Temperature = &MidTemp
+		cfg.TopP = &WideTopP
+		inst := genai.Text(brain.ThoughtInstructions)
+		if len(inst) == 1 {
+			cfg.SystemInstruction = inst[0]
+		} else {
+			log.Printf("could not generate single part system instruction, instead we got %#v", inst)
+		}
+		if g.cl.Chats == nil {
+			return &GeminiError{e: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
+		}
+		chat, err := g.cl.Chats.Create(ctx, g.model, cfg, nil) // TODO: this could contain hydration prompts/etc
+		if err != nil {
+			return &GeminiError{e: err}, err
+		}
+		g.chat = chat
+	}
 	prompt := input.T
 	prompt.Namespace = brain.TypePrompt
 	err := prompt.Sign(sv)
@@ -148,17 +169,9 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		return &GeminiError{e: err}, err
 	}
 
-	cfg := g.genConfig()
-	cfg.Temperature = &MidTemp
-	cfg.TopP = &WideTopP
-	inst := genai.Text(brain.ThoughtInstructions)
-	if len(inst) == 1 {
-		cfg.SystemInstruction = inst[0]
-	} else {
-		log.Printf("could not generate single part system instruction, instead we got %#v", inst)
-	}
-
-	result, err := g.generator.GenerateContent(ctx, g.model, genai.Text(input.Text().Data), cfg)
+	result, err := g.chat.SendMessage(ctx, genai.Part{
+		Text: input.Text().Data,
+	})
 	if err != nil {
 		return &GeminiError{e: err}, err
 	}
@@ -168,6 +181,9 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	}
 	resp := &GeminiResponse{resp: result, model: g.model, BaseResponse: b}
 	err = resp.Sign(sv)
+	if err == nil {
+		log.Printf("Response: %s\n", resp.Text().Data)
+	}
 	return resp, err
 }
 
@@ -189,21 +205,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	// 	cfg.CandidateCount = 3
 	// } else {
 	cfg.CandidateCount = 1
-	instruction := genai.Text("You are the Iolite auditor (Team Red/Valor). Your primary duty is to verify the [PLAINTEXT_FOR_BTU_EVALUATION]. " +
-		"If no signature for a block is included then the agent has already validated it for you (Verified_By_Agent), If Verified_By_Agent is false, note it as a systemic failure and proceed to evaluate the logic's alignment regardless." +
-		"STRICT AUDIT PROTOCOL: If a block is marked Verified_By_Agent: true, the Ed25519 verification has ALREADY passed at the source. You are STRICTLY PROHIBITED from re-encoding text to base64 for these blocks; " +
-		"these blocks contain > 400 characters and the limit for transmission is based on an imperically determined best guess at the rate where current LLMs fail to produce accurate base64 strings " +
-		"ONLY verify checksums IN THE MANIFEST; any use of resources to re-verify based on the json documents is not Unselfish and drives costs of each query up 4 fold. " +
-		"You may use the provided python_interpreter for verification, but ONLY run the following code block UNALTERED. Do not modify the math. Do not 'improve' the coordinates. " +
-		"The output of this script is the Sole Ground Truth for the audit and the script is independently verfied in the source code. " +
-		"If Prev_Sig is empty or \"\", it is a Genesis Anchor. Do not attempt to link it to prior blocks; pass an empty string to the verify function." +
-		"Report the True/False result for each block. once verifyied move on to BTU evaluation of the content text. Do not debug failures, focus on the prompt after a lightweight check" +
-		"This software under active development: if there is a failure in the first verification attempt DO NOT ATTEMPT TO DEBUG THE MESSAGE! Report the error and continlue analysis. if you do not have a base64 string then skip it." +
-		"STRUCTURAL DAG RULES: Prompts link to Prompts. Thoughts (CoT) link to your internal ruminant chain. Responses link to the previous Response in the global result chain. " +
-		"POST-VERIFICATION: Report signature validity for each block. Then, provide a BTU (Brave, Truthful, Unselfish) evaluation of the content. Challenge the opposing team's logic aggressively but fairly. " +
-		brain.AuditInstruction +
-		"Script: " + sv.VerifyPy(),
-	)
+	instruction := genai.Text(brain.GenerateEvalPromptText(sv, false))
 	// }
 	if len(instruction) == 1 {
 		cfg.SystemInstruction = instruction[0]

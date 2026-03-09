@@ -8,6 +8,10 @@ type MockDecision struct {
 	setErr error
 }
 
+func (*MockDecision) GenesisPrompt() Signed {
+	return Signed{}
+}
+
 func (m *MockDecision) Clone() Decision {
 	return &MockDecision{Mock: m.Mock, setErr: m.setErr}
 }
