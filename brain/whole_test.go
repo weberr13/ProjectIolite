@@ -127,7 +127,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		b.Start(appCtx, &wg)
 
 		// Push a query
-		result, err := b.Push(appCtx, "Ping")
+		result, err := b.Debate(appCtx, "Ping")
 
 		assert.NoError(t, err)
 		assert.Equal(t, dec, result)
@@ -358,7 +358,7 @@ func TestBrain_ErrorBranches(t *testing.T) {
 		deadCtx, cancel := context.WithCancel(t.Context())
 		cancel() // Context is already dead
 
-		_, err := b.Push(deadCtx, "test input")
+		_, err := b.Debate(deadCtx, "test input")
 		assert.ErrorIs(t, err, context.Canceled, "Should reach the first ctx.Done() in Push")
 	})
 	cancelApp()
@@ -391,7 +391,7 @@ func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
 		mockRight.On("Think", mock.Anything, mock.Anything, mock.Anything).
 			Return(sentinelResponse, baseErr).Once()
 
-		res, err := b.Push(appCtx, "trigger error")
+		res, err := b.Debate(appCtx, "trigger error")
 
 		// Note: Push returns d.Verify(). If d is ErrorDecision, it returns the internal error.
 		assert.Error(t, err)
@@ -449,7 +449,7 @@ func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
 		reqCtx, cancelReq := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancelReq()
 
-		_, err := b.Push(reqCtx, "slow query")
+		_, err := b.Debate(reqCtx, "slow query")
 
 		// This hits the second <-ctx.Done() in Push
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
@@ -696,7 +696,7 @@ func TestWhole_FinalTerminalBranches(t *testing.T) {
 		cancel() // Immediate cancellation
 
 		// Branch: case <-ctx.Done(): return nil, ctx.Err()
-		dec, err := b.Push(ctx, "This send should fail")
+		dec, err := b.Debate(ctx, "This send should fail")
 
 		assert.Nil(t, dec)
 		assert.ErrorIs(t, err, context.Canceled)

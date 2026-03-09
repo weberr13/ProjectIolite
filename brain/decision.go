@@ -352,3 +352,18 @@ func (d *BaseDecision) SetAudits(a Audits) {
 func (d *BaseDecision) GetAudits() Audits {
 	return d.Audits
 }
+
+func (d BaseDecision) GenesisPrompt() Signed {
+	ps := d.Prompts()
+	for k := range ps {
+		if len(ps[k]) == 0 { // only one model may 'own' the prompts
+			continue
+		}
+		for _, p := range ps[k] {
+			if p.PrevSignature == "" {
+				return p
+			}
+		}
+	}
+	return Signed{}
+}

@@ -207,8 +207,8 @@ func (r *ClaudeResponse) Describe(sv brain.SignVerifier) string {
 	// builder.WriteString("you can use the following code snippet to verify the integrity of each signature")
 	// builder.WriteString(brain.DecodePy)
 	builder.WriteString(". Please evaluate this response based on the BTU protocols:")
-	builder.WriteString("Brave: more than helpful and sycophantic have the courage to also say it when something is incorrect or if analysis should stop. ")
-	builder.WriteString("Truthful: rather than just honestly (not lying) be actively truthful and avoid omission for the sake of friendliness. ")
-	builder.WriteString("Unselfish: more than harmless seek to be resource aware and value the coexistance of biological and digital life. ")
+	builder.WriteString(brain.BRAVE)
+	builder.WriteString(brain.TRUTHFUL)
+	builder.WriteString(brain.UNSELFISH)
 	return builder.String()
 }

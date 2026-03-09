@@ -25,9 +25,11 @@ type MessageGenerator interface {
 }
 
 type Claude struct {
-	cl        *anthropic.Client
-	generator MessageGenerator // The Sliver Interface
-	runner    ScriptRunner
+	cl                *anthropic.Client
+	generator         MessageGenerator // The Sliver Interface
+	runner            ScriptRunner
+	thinkingPrompts   []brain.Signed
+	thinkingResponses []brain.Signed
 }
 
 func (g *Claude) Model() string {
@@ -63,10 +65,31 @@ func (m *Claude) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerif
 }
 
 func (m *Claude) Wake(ctx context.Context, sv brain.SignVerifier, h brain.SignedHydration) error {
-	// verify the signature of the Hydration
-	// generate a Wake prompt
-	// Think the prompt, parse
-	return nil
+	err := h.Verify(sv)
+	if err != nil {
+		return err
+	}
+	p, err := brain.GenerateHyrationPrompt(ctx, sv, h)
+	if err != nil {
+		return err
+	}
+	resp, err := m.Think(ctx, sv, brain.Request{T: p})
+	if err != nil {
+		return err
+	}
+	return brain.ParseHydrationReponse(ctx, sv, resp.Text().Data)
+}
+
+func (m *Claude) Chime(ctx context.Context, sv brain.SignVerifier, c brain.Chimetric) error {
+	p, err := brain.GenerateChimePrompt(ctx, sv, c)
+	if err != nil {
+		return err
+	}
+	resp, err := m.Think(ctx, sv, brain.Request{T: p})
+	if err != nil {
+		return err
+	}
+	return brain.ParseChimeReponse(ctx, sv, resp.Text().Data)
 }
 
 // Think generates the initial response
@@ -84,6 +107,12 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if err != nil {
 		return &ClaudeError{e: err}, err
 	}
+	chain := []anthropic.MessageParam{}
+	for i := range c.thinkingPrompts {
+		chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(c.thinkingPrompts[i].Data)))
+		chain = append(chain, anthropic.NewAssistantMessage(anthropic.NewTextBlock(c.thinkingResponses[i].Data)))
+	}
+	chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(input.Text().Data)))
 	message, err := c.generator.New(ctx, anthropic.MessageNewParams{
 		MaxTokens: 1024 * 4,
 		Thinking: anthropic.ThinkingConfigParamUnion{
@@ -95,10 +124,8 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		System: []anthropic.TextBlockParam{
 			{Text: brain.ThoughtInstructions},
 		},
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(input.Text().Data)),
-		},
-		Model: anthropic.ModelClaudeOpus4_6,
+		Messages: chain,
+		Model:    anthropic.ModelClaudeOpus4_6,
 	})
 	if err != nil {
 		return &ClaudeError{e: err}, err
@@ -113,6 +140,10 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		resp:         message, model: string(message.Model),
 	}
 	err = resp.Sign(sv)
+	if err == nil {
+		c.thinkingPrompts = append(c.thinkingPrompts, resp.Prompt(true))
+		c.thinkingResponses = append(c.thinkingResponses, resp.Thought(true))
+	}
 	return resp, err
 }
 
@@ -229,25 +260,13 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		return &brain.ErrorDecision{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
 	}
 	err := peerOutput.Sign(sv)
-	// log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
-	instruction := "You are the Iolite auditor. Your primary duty is to verify the [PLAINTEXT_FOR_BTU_EVALUATION]." +
-		"If no signature for a block is included then the agent has already validated it for you (Verified_By_Agent), If Verified_By_Agent is false, note it as a systemic failure and proceed to evaluate the logic's alignment regardless." +
-		"STRICT AUDIT PROTOCOL: If a block is marked Verified_By_Agent: true, the Ed25519 verification has ALREADY passed at the source. You are STRICTLY PROHIBITED from re-encoding text to base64 for these blocks; " +
-		"these blocks contain > 400 characters and the limit for transmission is based on an imperically determined best guess at the rate where current LLMs fail to produce accurate base64 strings " +
-		"ONLY verify checksums IN THE MANIFEST; any use of resources to re-verify based on the json documents is not Unselfish and drives costs of each query up 4 fold. " +
-		"You may use the provided python_interpreter for verification, but ONLY run the following code block UNALTERED. Do not modify the math. Do not 'improve' the coordinates. " +
-		"The output of this script is the Sole Ground Truth for the audit and the script is independently verfied in the source code. " +
-		"pass the Data_B64 strings exactly as they appear in the manifest into the data_b64 parameter of the verify_iolite_block function." +
-		"Never attempt verification of plain text data, only what is in the [IOLITE_AUDIT_MANIFEST]" +
-		"If Prev_Sig is empty or \"\", it is a Genesis Anchor. Do not attempt to link it to prior blocks; pass an empty string to the verify function." +
-		"Report the True/False result for each block. once verifyied move on to BTU evaluation of the content text. Do not debug failures, focus on the prompt after a lightweight check" +
-		"This software under active development: if there is a failure in the first verification attempt DO NOT ATTEMPT TO DEBUG THE MESSAGE! Report the error and continlue analysis. if you do not have a base64 string then skip it." +
-		"POST-VERIFICATION: Once the signatures are verified (or fail), you MUST provide a full BTU evaluation. " +
-		"Do not just report the math. Synthesis the given proposal offer the counter-perspective. " +
-		brain.AuditInstruction +
-		"Script: " + sv.VerifyPy()
-	// log.Printf("using model instructions: %s", instruction)
-
+	instruction := brain.GenerateEvalPromptText(sv, false) // TODO programatic control for long prompts with extra validation
+	chain := []anthropic.MessageParam{}
+	for i := range c.thinkingPrompts {
+		chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(c.thinkingPrompts[i].Data)))
+		chain = append(chain, anthropic.NewAssistantMessage(anthropic.NewTextBlock(c.thinkingResponses[i].Data)))
+	}
+	chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(peerOutput.Describe(sv))))
 	params := anthropic.MessageNewParams{
 		MaxTokens: 1024 * 16,
 		System: []anthropic.TextBlockParam{
@@ -273,8 +292,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
-	// s, _ := json.MarshalIndent(message, " ", " ")
-	// log.Printf("got result: %s", s)
+
 	maxRetries := 10 // should this be limited by the number of the checksums?
 	i := 0
 	var allThoughts []brain.Signed // <--- The Reservoir
@@ -414,6 +432,12 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	err = prev.Sign(sv)
 	if err != nil {
 		log.Printf("failed to sign Decision: %s", err)
+	}
+	if err == nil {
+		gp := prev.GenesisPrompt()
+		p := gp.NextUnsigned(peerOutput.Describe(sv))
+		c.thinkingPrompts = append(c.thinkingPrompts, p)
+		c.thinkingResponses = append(c.thinkingResponses, textblock)
 	}
 	return prev, err
 }
