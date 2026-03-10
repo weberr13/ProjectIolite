@@ -100,7 +100,7 @@ type Thinker interface {
 	// Think generates the initial response
 	Think(ctx context.Context, sv SignVerifier, input Request) (Response, error)
 	// Evaluate audits another brain's output
-	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response) (Decision, error)
+	Evaluate(ctx context.Context, sv SignVerifier, peerOutput Response, stateless bool) (Decision, error)
 	// Generate a Hydration message
 	Dream(ctx context.Context, spec *openapi3.T, sv SignVerifier) ([]SignedHydration, error)
 	// Wake rehydrate from the dream in a new context
@@ -114,6 +114,7 @@ type Thinker interface {
 type Request struct {
 	T Signed
 	G []Signed
+	Stateless bool
 }
 
 type Wakeup struct {
@@ -305,6 +306,7 @@ type Whole struct {
 type Query struct {
 	input    string
 	strategy []string
+	stateless bool
 	C        chan Decision
 }
 
@@ -387,7 +389,7 @@ func (b *Whole) Ready() error {
 	return nil
 }
 
-func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signed, genesis ...Signed) (Decision, error) {
+func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signed, stateless bool, genesis ...Signed) (Decision, error) {
 	var think Thinker
 	var eval Thinker
 	var ok bool
@@ -404,7 +406,7 @@ func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signe
 			think = b.thinkers["left"]
 		}
 	}
-	resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt, G: genesis})
+	resp, err := think.Think(ctx, b.signVerifier, Request{T: prompt, G: genesis, Stateless: stateless})
 	if err != nil {
 		return &ErrorDecision{E: err}, err
 	}
@@ -414,7 +416,7 @@ func (b *Whole) debateCycle(ctx context.Context, strategy []string, prompt Signe
 	if resp.IsError() != nil {
 		return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 	}
-	return eval.Evaluate(ctx, b.signVerifier, resp)
+	return eval.Evaluate(ctx, b.signVerifier, resp, false)
 }
 
 func (b *Whole) HasThinkers() int {
@@ -498,7 +500,7 @@ func (b *Whole) Hydrate(ctx context.Context, d SignedHydration, half string) err
 	return ErrUnknownHalf
 }
 
-func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser, strategy ...string) (Decision, error) {
+func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser, stateless bool, strategy ...string) (Decision, error) {
 	var dec Decision
 	var cycleErr error
 
@@ -509,7 +511,10 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		var think Thinker
 		for _, think = range b.thinkers {
 		}
-		resp, err := think.Think(ctx, b.signVerifier, Request{T: Signed{Data: prompt}})
+		resp, err := think.Think(ctx, b.signVerifier, Request{
+			T: Signed{Data: prompt},
+			Stateless: stateless,
+		})
 		if err != nil {
 			return &ErrorDecision{E: err}, err
 		}
@@ -519,9 +524,9 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 		if resp.IsError() != nil {
 			return &ErrorDecision{E: resp.IsError()}, resp.IsError()
 		}
-		dec, cycleErr = think.Evaluate(ctx, b.signVerifier, resp)
+		dec, cycleErr = think.Evaluate(ctx, b.signVerifier, resp, false)
 	default:
-		dec, cycleErr = b.debateCycle(ctx, strategy, Signed{Data: prompt})
+		dec, cycleErr = b.debateCycle(ctx, strategy, Signed{Data: prompt}, false)
 	}
 	if cycleErr != nil {
 		return dec, cycleErr
@@ -553,7 +558,7 @@ func (b *Whole) Think(ctx context.Context, prompt string, parser *DecisionParser
 			log.Printf("recursion failure: next prompt error: %s\n", err)
 			return decisions.Fold(b.signVerifier), err
 		}
-		dec, cycleErr := b.debateCycle(ctx, strategy, pp, p)
+		dec, cycleErr := b.debateCycle(ctx, strategy, pp, stateless, p)
 		if cycleErr != nil {
 			log.Printf("genesis prompt: %#v", p)
 			log.Printf("recursion failure: cycle error: %s\n", cycleErr)
@@ -733,7 +738,7 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
 					defer cancel()
 					log.Printf("got prompt: %s\n", q.input)
-					d, err := b.Think(ctx, q.input, &DecisionParser{}, q.strategy...)
+					d, err := b.Think(ctx, q.input, &DecisionParser{}, q.stateless, q.strategy...)
 					defer func() {
 						if d != nil {
 							now := time.Now()
@@ -809,10 +814,10 @@ func (b *Whole) Learn(ctx context.Context, req ChimetricCorrection) error {
 
 // Debate sends a query to the brain and waits for the decision.
 // It respects the internal maxQueryTime for the think loop.
-func (b *Whole) Debate(ctx context.Context, input string, strategy ...string) (Decision, error) {
+func (b *Whole) Debate(ctx context.Context, input string, stateless bool, strategy ...string) (Decision, error) {
 	c := make(chan Decision, 1)
 	select {
-	case b.queries <- Query{input: input, strategy: strategy, C: c}:
+	case b.queries <- Query{input: input, strategy: strategy, C: c, stateless: stateless}:
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}

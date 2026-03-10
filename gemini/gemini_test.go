@@ -27,7 +27,7 @@ func TestGemini_Evaluate_NoNil(t *testing.T) {
 		badG := &Gemini{cl: nil}
 		mockPeer := new(MockResponse)
 
-		dec, err := badG.Evaluate(ctx, mockSV, mockPeer)
+		dec, err := badG.Evaluate(ctx, mockSV, mockPeer, false)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "client not initialized")
@@ -76,7 +76,7 @@ func TestGemini_Evaluate_NoNil(t *testing.T) {
 		// fails with our specific error.
 		mockPeerResp.On("Verify", mock.Anything).Return(verifyErr)
 
-		dec, err := g.Evaluate(ctx, mockSV, mockPeerResp)
+		dec, err := g.Evaluate(ctx, mockSV, mockPeerResp, false)
 
 		// ASSERTIONS
 		assert.ErrorIs(t, err, verifyErr)
@@ -123,7 +123,7 @@ func TestGemini_Evaluate_RevealTheNil(t *testing.T) {
 		mockPeerResp.On("Verify", mock.Anything).Return(verifyErr)
 
 		// 4. EXECUTION
-		decision, err := g.Evaluate(ctx, mockSV, mockPeerResp)
+		decision, err := g.Evaluate(ctx, mockSV, mockPeerResp, false)
 
 		// THE REVEAL: If the bug exists, 'decision' will be nil here.
 		assert.NotNil(t, decision, "THE BUG REVEALED: Evaluate returned (nil, err) because NewDecision failed!")
@@ -303,7 +303,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockGen.On("GenerateContent", ctx, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, genErr).Once()
 
-		dec, err := g.Evaluate(ctx, mockSV, peerOutput)
+		dec, err := g.Evaluate(ctx, mockSV, peerOutput, false)
 		assert.ErrorIs(t, err, genErr)
 		assert.IsType(t, &brain.ErrorDecision{}, dec)
 	})
@@ -336,7 +336,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		peerOutput.On("Prompt").Return(brain.Signed{Signature: promptSig}).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-		dec, err := g.Evaluate(ctx, mockSV, peerOutput)
+		dec, err := g.Evaluate(ctx, mockSV, peerOutput, false)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, dec)
@@ -392,7 +392,7 @@ func TestGemini_Evaluate_Advanced(t *testing.T) {
 		mockSV.On("ExportPublicKey").Return("fakePubKey").Maybe()
 
 		// 4. Execution
-		dec, err := g.Evaluate(ctx, mockSV, peerOutput)
+		dec, err := g.Evaluate(ctx, mockSV, peerOutput, false)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, dec)
@@ -430,7 +430,7 @@ func TestGemini_Evaluate_FinalBranches(t *testing.T) {
 		mockSV.On("Sign", mock.Anything).Return("text", nil).Maybe()
 		mockSV.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-		_, _ = g.Evaluate(ctx, mockSV, peerOutput)
+		_, _ = g.Evaluate(ctx, mockSV, peerOutput, false)
 		// Check logs for "could not generate single part system instruction"
 	})
 

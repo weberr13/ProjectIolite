@@ -196,13 +196,15 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	err = resp.Sign(sv)
 	if err == nil {
 		log.Printf("Response: %s\n", resp.Text().Data)
-		g.history.AppendInPlace(resp.Prompt(true), resp.Thought(true))
+		if !input.Stateless {
+			g.history.AppendInPlace(resp.Prompt(true), resp.Thought(true))
+		}
 	}
 	return resp, err
 }
 
 // Evaluate audits another brain's output
-func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response) (brain.Decision, error) {
+func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, stateless bool) (brain.Decision, error) {
 	now := time.Now()
 	defer func() {
 		log.Printf("Evaluate took: %v", time.Since(now))
@@ -271,7 +273,7 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		return prev, err
 	}
 	err = prev.Sign(sv)
-	if err == nil {
+	if err == nil && !stateless {
 		gp := prev.GenesisPrompt()
 		p := gp.NextUnsigned(peerOutput.Describe(sv))
 		g.history.AppendInPlace(p, textBlock)

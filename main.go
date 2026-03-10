@@ -118,7 +118,8 @@ func setupRouter(backend *brain.Whole, sv brain.SignVerifier) *chi.Mux {
 		r.Post("/think", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				Prompt   string   `json:"prompt"`
-				Strategy []string `json:"strategy"` // 🛡️ [USER_CONTROL]
+				Strategy []string `json:"strategy"`
+				Stateless bool `json:"stateless"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
@@ -131,7 +132,7 @@ func setupRouter(backend *brain.Whole, sv brain.SignVerifier) *chi.Mux {
 			}
 
 			// Use the app context or request context
-			decision, err := backend.Debate(r.Context(), req.Prompt, req.Strategy...)
+			decision, err := backend.Debate(r.Context(), req.Prompt, req.Stateless, req.Strategy...)
 			if err != nil {
 				// log.Printf("got decision : %#v and error %s", decision, err)
 				// Handle the singularity

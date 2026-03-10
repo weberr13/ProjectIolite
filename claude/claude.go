@@ -150,7 +150,7 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		resp:         message, model: string(message.Model),
 	}
 	err = resp.Sign(sv)
-	if err == nil {
+	if err == nil && !input.Stateless {
 		c.history.AppendInPlace(resp.Prompt(true), resp.Thought(true))
 	}
 	return resp, err
@@ -260,7 +260,7 @@ func commentsToCoT(sv brain.SignVerifier, message *anthropic.ToolUseBlock, previ
 }
 
 // Evaluate audits another brain's output
-func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response) (brain.Decision, error) {
+func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, stateless bool) (brain.Decision, error) {
 	now := time.Now()
 	defer func() {
 		log.Printf("Evaluate took: %v", time.Since(now))
@@ -441,7 +441,7 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if err != nil {
 		log.Printf("failed to sign Decision: %s", err)
 	}
-	if err == nil {
+	if err == nil && !stateless {
 		gp := prev.GenesisPrompt()
 		p := gp.NextUnsigned(peerOutput.Describe(sv))
 		c.history.AppendInPlace(p, textblock)

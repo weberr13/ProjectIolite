@@ -251,7 +251,7 @@ func TestClaude_Evaluate_ToolUseLoop(t *testing.T) {
 		// mockRunner.On("Run", mock.Anything, "print(1+1)").Return("2\n", nil).Once()
 		mockPeerResp.On("Verify", mockSV).Return(nil).Maybe()
 
-		decision, err := c.Evaluate(ctx, mockSV, mockPeerResp)
+		decision, err := c.Evaluate(ctx, mockSV, mockPeerResp, false)
 
 		// ASSERTIONS
 		assert.NoError(t, err)
