@@ -128,6 +128,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 			for i := range d.ChainOfThoughts[k] {
 				for j := range d.ChainOfThoughts[k][i] {
 					if d.ChainOfThoughts[k][i][j].Signature == "" {
+						log.Printf("UNSIGNED: %#v", d.ChainOfThoughts[k][i][j])
 						return ErrUnsigned
 					}
 				}
@@ -147,6 +148,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		} else {
 			for i := range d.AllPrompts[k] {
 				if d.AllPrompts[k][i].Signature == "" {
+					log.Printf("UNSIGNED: %#v", d.AllPrompts[k][i])
 					return ErrUnsigned
 				}
 			}
@@ -165,6 +167,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		} else {
 			for i := range d.AllTexts[k] {
 				if d.AllTexts[k][i].Signature == "" {
+					log.Printf("UNSIGNED: %#v", d.AllTexts[k][i])
 					return ErrUnsigned
 				}
 			}
@@ -183,6 +186,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		} else {
 			for i := range d.AllToolRequests[k] {
 				if d.AllToolRequests[k][i].Signature == "" {
+					log.Printf("UNSIGNED: %#v", d.AllToolRequests[k][i])
 					return ErrUnsigned
 				}
 			}
@@ -201,6 +205,7 @@ func (d *BaseDecision) Sign(sv SignVerifier) error {
 		} else {
 			for i := range d.AllToolResponses[k] {
 				if d.AllToolResponses[k][i].Signature == "" {
+					log.Printf("UNSIGNED: %#v", d.AllToolResponses[k][i])
 					return ErrUnsigned
 				}
 			}

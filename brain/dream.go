@@ -69,6 +69,7 @@ func (sh *SignedHydration) Sign(sv SignVerifier) error {
 
 func (sh *SignedHydration) Verify(sv SignVerifier) error {
 	if sh.Signature == "" {
+		log.Printf("UNSIGNED: %#v", sh)
 		return ErrUnsigned
 	}
 	b, err := json.Marshal(sh.Hydration)

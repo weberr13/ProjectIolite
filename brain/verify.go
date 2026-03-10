@@ -30,7 +30,7 @@ func VerifyBraid(ctx context.Context, sv SignVerifier, data SignedContainer) err
 			return ctx.Err()
 		}
 		if s.Signature == "" {
-			log.Printf("block %#v appears to be unsigned", s)
+			log.Printf("UNSIGNED: %#v", s)
 			return ErrUnsigned
 		}
 		if data.GetPublicKey() == "" {

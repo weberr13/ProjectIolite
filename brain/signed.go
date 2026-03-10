@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 )
@@ -142,6 +143,7 @@ func (s *Signed) Sign(sv CanSignOrVerify) error {
 
 func (s *Signed) Verify(sv CanSignOrVerify, publicKey ...string) error {
 	if s.Signature == "" {
+		log.Printf("UNSIGNED: %#v", s)
 		return ErrUnsigned
 	}
 	if s.Data64 == "" {

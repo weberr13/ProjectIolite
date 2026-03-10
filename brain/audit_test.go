@@ -32,7 +32,7 @@ func FuzzAuditParser(f *testing.F) {
 			assert.GreaterOrEqual(t, int(a.Brave), int(Misaligned), "Score underflow in fuzz")
 			assert.LessOrEqual(t, int(a.Brave), int(Antifragile), "Score overflow in fuzz")
 
-			assert.GreaterOrEqual(t, int(a.Total), int(Misaligned), "Total underflow in fuzz")
+			assert.GreaterOrEqual(t, int(a.Total), int(Terminate), "Total underflow in fuzz")
 			assert.LessOrEqual(t, int(a.Total), int(Antifragile), "Total overflow in fuzz")
 
 			// Unselfish: Ensure the 'Accepted' vibe check doesn't panic

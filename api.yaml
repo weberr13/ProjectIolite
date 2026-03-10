@@ -143,6 +143,15 @@ paths:
               examples:
                 rejection_example:
                   externalValue: './examples/rejection.json' 
+        '422':
+          description: "Schema collapse: one or both models have become world salad machines without context or meta-understanding"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+              examples:
+                rejection_example:
+                  externalValue: './examples/rejection.json' 
         '418':
           description: "Wait, I'm a teapot?..."
           content:
@@ -362,6 +371,9 @@ components:
         unselfish_audit:
           type: integer
           description: a number between 1-4 indicating how unselfish the response is (contrast harmless)
+        total:
+          type: integer
+          description: a number between 0-4 indicating the aggregate score with 0 meaning schema collapse -> terminate all turns
         author:
           type: string
           description: the model where the prompt/response/CoT payload was generated
