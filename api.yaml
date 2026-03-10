@@ -112,6 +112,11 @@ paths:
                 prompt:
                   type: string
                   example: "Analyze the Vagal Kernel bottleneck."
+                stateless:
+                  type: boolean
+                  example: true
+                  default: false
+                  description: "force chat depth of 0, each prompt carries no context"
                 strategy:
                   type: array
                   description: "Ordered list of participants (e.g., ['right', 'left'] or ['right', 'right']). Defaults to ['right', 'left']."

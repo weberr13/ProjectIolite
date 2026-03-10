@@ -74,7 +74,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 		mockLeft.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
 
-		result, err := b.Think(ctx, prompt, &DecisionParser{})
+		result, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		assert.NoError(t, err)
 		assert.Equal(t, dec, result)
@@ -96,7 +96,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 		mockLeft.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
 
-		result, err := b.Think(ctx, prompt, &DecisionParser{})
+		result, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		assert.NoError(t, err)
 		assert.Equal(t, dec, result)
@@ -127,7 +127,7 @@ func TestWhole_Orchestration(t *testing.T) {
 		b.Start(appCtx, &wg)
 
 		// Push a query
-		result, err := b.Debate(appCtx, "Ping")
+		result, err := b.Debate(appCtx, "Ping", false)
 
 		assert.NoError(t, err)
 		assert.Equal(t, dec, result)
@@ -151,9 +151,8 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 			signVerifier: mockSV,
 		}
 
-		decision, err := b.Think(ctx, prompt, &DecisionParser{})
+		decision, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
-		// Assertions for the &ErrorDecision return
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
 		assert.IsType(t, &ErrorDecision{}, decision)
 		assert.Equal(t, ErrNoLLMBrain, decision.IsError())
@@ -178,7 +177,7 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 		mockRight.On("Evaluate", ctx, mockSV, resp, mock.Anything).Return(dec, nil).Once()
 
-		result, err := b.Think(ctx, prompt, &DecisionParser{})
+		result, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		assert.NoError(t, err)
 		assert.Equal(t, dec, result)
@@ -197,7 +196,7 @@ func TestWhole_Think_BranchCoverage(t *testing.T) {
 		thinkErr := errors.New("api_timeout_from_gemini")
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return((*MockResponse)(nil), thinkErr).Once()
 
-		decision, err := b.Think(ctx, prompt, &DecisionParser{})
+		decision, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		// Verify the error is wrapped in ErrorDecision and returned
 		assert.ErrorIs(t, err, thinkErr)
@@ -227,7 +226,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		leftErr := errors.New("claude_api_error")
 		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return((*MockResponse)(nil), leftErr).Once()
 
-		decision, err := b.Think(ctx, prompt, &DecisionParser{})
+		decision, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		assert.ErrorIs(t, err, leftErr)
 		assert.IsType(t, &ErrorDecision{}, decision)
@@ -250,7 +249,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		// The code attempts Right.Think first in the dual-brain scenario
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return((*MockResponse)(nil), rightErr).Once()
 
-		decision, err := b.Think(ctx, prompt, &DecisionParser{})
+		decision, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		assert.ErrorIs(t, err, rightErr)
 		assert.Equal(t, rightErr, decision.IsError())
@@ -283,7 +282,7 @@ func TestWhole_Think_AdvancedBranches(t *testing.T) {
 		// Ensure mockResp from Right is the exact object passed to Left.Evaluate
 		mockLeft.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
-		result, err := b.Think(ctx, prompt, &DecisionParser{})
+		result, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		assert.NoError(t, err)
 		assert.Equal(t, dec, result)
@@ -318,7 +317,7 @@ func TestWhole_Think_ContextSanity_Fixed(t *testing.T) {
 			return c.Err() != nil // Verify the context passed is indeed canceled
 		}), mockSV, resp).Return(&ErrorDecision{E: expectedErr}, expectedErr).Once()
 
-		decision, err := b.Think(ctx, prompt, &DecisionParser{})
+		decision, err := b.Think(ctx, prompt, &DecisionParser{}, false)
 
 		// ASSERTIONS
 		assert.ErrorIs(t, err, expectedErr)
@@ -358,7 +357,7 @@ func TestBrain_ErrorBranches(t *testing.T) {
 		deadCtx, cancel := context.WithCancel(t.Context())
 		cancel() // Context is already dead
 
-		_, err := b.Debate(deadCtx, "test input")
+		_, err := b.Debate(deadCtx, "test input", false)
 		assert.ErrorIs(t, err, context.Canceled, "Should reach the first ctx.Done() in Push")
 	})
 	cancelApp()
@@ -391,7 +390,7 @@ func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
 		mockRight.On("Think", mock.Anything, mock.Anything, mock.Anything).
 			Return(sentinelResponse, baseErr).Once()
 
-		res, err := b.Debate(appCtx, "trigger error")
+		res, err := b.Debate(appCtx, "trigger error", false)
 
 		// Note: Push returns d.Verify(). If d is ErrorDecision, it returns the internal error.
 		assert.Error(t, err)
@@ -449,7 +448,7 @@ func TestBrain_LifecycleAndErrorBranches(t *testing.T) {
 		reqCtx, cancelReq := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancelReq()
 
-		_, err := b.Debate(reqCtx, "slow query")
+		_, err := b.Debate(reqCtx, "slow query", false)
 
 		// This hits the second <-ctx.Done() in Push
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
@@ -474,7 +473,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		// Branch: if resp == nil { return &ErrorDecision{E: ErrNoLLMBrain}, err }
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(nil, nil).Once()
 
-		dec, err := b.Think(ctx, prompt, parser)
+		dec, err := b.Think(ctx, prompt, parser, false)
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
 		assert.NotNil(t, dec)
 	})
@@ -486,7 +485,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		// Branch: if resp == nil { return &ErrorDecision{E: ErrNoLLMBrain}, err }
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(nil, nil).Once()
 
-		dec, err := b.Think(ctx, prompt, parser)
+		dec, err := b.Think(ctx, prompt, parser, false)
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
 		assert.NotNil(t, dec)
 	})
@@ -502,7 +501,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 
 		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 
-		dec, err := b.Think(ctx, prompt, parser)
+		dec, err := b.Think(ctx, prompt, parser, false)
 		assert.ErrorIs(t, err, sentinelErr)
 		assert.Equal(t, sentinelErr, dec.IsError())
 	})
@@ -518,7 +517,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 
 		mockLeft.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 
-		dec, err := b.Think(ctx, prompt, parser)
+		dec, err := b.Think(ctx, prompt, parser, false)
 		assert.ErrorIs(t, err, sentinelErr)
 		assert.Equal(t, sentinelErr, dec.IsError())
 	})
@@ -540,7 +539,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 		mockLeft.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
-		result, err := b.Think(ctx, prompt, parser)
+		result, err := b.Think(ctx, prompt, parser, false)
 		assert.Equal(t, decSentinel, result.IsError())
 		assert.NoError(t, err) // Matches current logic: return dec, cycleErr (where cycleErr is nil)
 	})
@@ -560,7 +559,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		mockRight.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
 		// Branch: if err != nil { return dec, err } (e.g., no terminal decision found)
-		_, err := b.Think(ctx, prompt, parser)
+		_, err := b.Think(ctx, prompt, parser, false)
 		assert.Equal(t, err, ErrNoConsensus)
 	})
 
@@ -582,7 +581,7 @@ func TestWhole_Think_MoreUnhappyBranches(t *testing.T) {
 		mockLeft.On("Evaluate", ctx, mockSV, resp).Return(dec, nil).Once()
 
 		// Branch: return dec, ErrNoConsensus
-		_, err := b.Think(ctx, prompt, parser)
+		_, err := b.Think(ctx, prompt, parser, false)
 		assert.ErrorIs(t, err, ErrNoConsensus)
 	})
 }
@@ -605,7 +604,7 @@ func TestWhole_Think_DefaultBrainFailures(t *testing.T) {
 
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(nil, nil).Once()
 
-		dec, err := b.Think(ctx, prompt, parser)
+		dec, err := b.Think(ctx, prompt, parser, false)
 
 		assert.ErrorIs(t, err, ErrNoLLMBrain)
 		assert.IsType(t, &ErrorDecision{}, dec)
@@ -624,7 +623,7 @@ func TestWhole_Think_DefaultBrainFailures(t *testing.T) {
 
 		mockRight.On("Think", ctx, mockSV, Request{T: Signed{Data: prompt}}).Return(resp, nil).Once()
 
-		dec, err := b.Think(ctx, prompt, parser)
+		dec, err := b.Think(ctx, prompt, parser, false)
 
 		assert.ErrorIs(t, err, sentinelErr)
 		assert.Equal(t, sentinelErr, dec.IsError())
@@ -696,7 +695,7 @@ func TestWhole_FinalTerminalBranches(t *testing.T) {
 		cancel() // Immediate cancellation
 
 		// Branch: case <-ctx.Done(): return nil, ctx.Err()
-		dec, err := b.Debate(ctx, "This send should fail")
+		dec, err := b.Debate(ctx, "This send should fail", false)
 
 		assert.Nil(t, dec)
 		assert.ErrorIs(t, err, context.Canceled)

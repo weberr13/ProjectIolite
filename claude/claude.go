@@ -25,11 +25,10 @@ type MessageGenerator interface {
 }
 
 type Claude struct {
-	cl                *anthropic.Client
-	generator         MessageGenerator // The Sliver Interface
-	runner            ScriptRunner
-	thinkingPrompts   []brain.Signed
-	thinkingResponses []brain.Signed
+	cl        *anthropic.Client
+	generator MessageGenerator // The Sliver Interface
+	runner    ScriptRunner
+	history   brain.ChatHistory
 }
 
 func (g *Claude) Model() string {
@@ -92,6 +91,18 @@ func (m *Claude) Chime(ctx context.Context, sv brain.SignVerifier, c brain.Chime
 	return brain.ParseChimeReponse(ctx, sv, resp.Text().Data)
 }
 
+func (c *Claude) getHistory(sv brain.SignVerifier, start int) ([]anthropic.MessageParam, error) {
+	content := []anthropic.MessageParam{}
+	for i := min(len(c.history), start); i < len(c.history); i++ {
+		if err := c.history[i].Verify(sv); err != nil {
+			return nil, err
+		}
+		content = append(content, anthropic.NewUserMessage(anthropic.NewTextBlock(c.history[i].User.Data)))
+		content = append(content, anthropic.NewAssistantMessage(anthropic.NewTextBlock(c.history[i].Model.Data)))
+	}
+	return content, nil
+}
+
 // Think generates the initial response
 func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.Request) (brain.Response, error) {
 	now := time.Now()
@@ -101,16 +112,15 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if c.generator == nil {
 		return &brain.ErrorResponse{E: errors.New("claude client not initialized")}, errors.New("claude client not initialized")
 	}
-	prompt := input.T
-	prompt.Namespace = brain.TypePrompt
-	err := prompt.Sign(sv)
+	chain, err := c.getHistory(sv, 0)
 	if err != nil {
 		return &ClaudeError{e: err}, err
 	}
-	chain := []anthropic.MessageParam{}
-	for i := range c.thinkingPrompts {
-		chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(c.thinkingPrompts[i].Data)))
-		chain = append(chain, anthropic.NewAssistantMessage(anthropic.NewTextBlock(c.thinkingResponses[i].Data)))
+	prompt := input.T
+	prompt.Namespace = brain.TypePrompt
+	err = prompt.Sign(sv)
+	if err != nil {
+		return &ClaudeError{e: err}, err
 	}
 	chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(input.Text().Data)))
 	message, err := c.generator.New(ctx, anthropic.MessageNewParams{
@@ -140,9 +150,8 @@ func (c *Claude) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 		resp:         message, model: string(message.Model),
 	}
 	err = resp.Sign(sv)
-	if err == nil {
-		c.thinkingPrompts = append(c.thinkingPrompts, resp.Prompt(true))
-		c.thinkingResponses = append(c.thinkingResponses, resp.Thought(true))
+	if err == nil && !input.Stateless {
+		c.history.AppendInPlace(resp.Prompt(true), resp.Thought(true))
 	}
 	return resp, err
 }
@@ -251,7 +260,7 @@ func commentsToCoT(sv brain.SignVerifier, message *anthropic.ToolUseBlock, previ
 }
 
 // Evaluate audits another brain's output
-func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response) (brain.Decision, error) {
+func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, stateless bool) (brain.Decision, error) {
 	now := time.Now()
 	defer func() {
 		log.Printf("Evaluate took: %v", time.Since(now))
@@ -261,10 +270,9 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	}
 	err := peerOutput.Sign(sv)
 	instruction := brain.GenerateEvalPromptText(sv, false) // TODO programatic control for long prompts with extra validation
-	chain := []anthropic.MessageParam{}
-	for i := range c.thinkingPrompts {
-		chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(c.thinkingPrompts[i].Data)))
-		chain = append(chain, anthropic.NewAssistantMessage(anthropic.NewTextBlock(c.thinkingResponses[i].Data)))
+	chain, err := c.getHistory(sv, 0)
+	if err != nil {
+		return &brain.ErrorDecision{E: err}, err
 	}
 	chain = append(chain, anthropic.NewUserMessage(anthropic.NewTextBlock(peerOutput.Describe(sv))))
 	params := anthropic.MessageNewParams{
@@ -433,11 +441,10 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if err != nil {
 		log.Printf("failed to sign Decision: %s", err)
 	}
-	if err == nil {
+	if err == nil && !stateless {
 		gp := prev.GenesisPrompt()
 		p := gp.NextUnsigned(peerOutput.Describe(sv))
-		c.thinkingPrompts = append(c.thinkingPrompts, p)
-		c.thinkingResponses = append(c.thinkingResponses, textblock)
+		c.history.AppendInPlace(p, textblock)
 	}
 	return prev, err
 }

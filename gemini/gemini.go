@@ -31,7 +31,7 @@ type Gemini struct {
 	model     string
 	cfg       *genai.ClientConfig
 	generator ContentGenerator
-	chat      *genai.Chat
+	history   brain.ChatHistory
 }
 
 func (g *Gemini) Model() string {
@@ -133,6 +133,24 @@ func (g *Gemini) genConfig() *genai.GenerateContentConfig {
 	}
 }
 
+func (g *Gemini) getHistory(sv brain.SignVerifier, start int) ([]*genai.Content, error) {
+	content := []*genai.Content{}
+	for i := min(len(g.history), start); i < len(g.history); i++ {
+		if err := g.history[i].Verify(sv); err != nil {
+			return nil, err
+		}
+		content = append(content, &genai.Content{
+			Role:  genai.RoleUser,
+			Parts: []*genai.Part{{Text: g.history[i].User.Data}},
+		})
+		content = append(content, &genai.Content{
+			Role:  genai.RoleModel,
+			Parts: []*genai.Part{{Text: g.history[i].Model.Data}},
+		})
+	}
+	return content, nil
+}
+
 // Think generates the initial response
 // Think is stateful (uses chat) where Evaluate is *not*
 func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.Request) (brain.Response, error) {
@@ -143,24 +161,14 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if g.cl == nil || g.generator == nil {
 		return &brain.ErrorResponse{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
 	}
-	if g.chat == nil {
-		cfg := g.genConfig()
-		cfg.Temperature = &MidTemp
-		cfg.TopP = &WideTopP
-		inst := genai.Text(brain.ThoughtInstructions)
-		if len(inst) == 1 {
-			cfg.SystemInstruction = inst[0]
-		} else {
-			log.Printf("could not generate single part system instruction, instead we got %#v", inst)
-		}
-		if g.cl.Chats == nil {
-			return &GeminiError{e: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
-		}
-		chat, err := g.cl.Chats.Create(ctx, g.model, cfg, nil) // TODO: this could contain hydration prompts/etc
-		if err != nil {
-			return &GeminiError{e: err}, err
-		}
-		g.chat = chat
+	cfg := g.genConfig()
+	cfg.Temperature = &MidTemp
+	cfg.TopP = &WideTopP
+	inst := genai.Text(brain.ThoughtInstructions)
+	if len(inst) == 1 {
+		cfg.SystemInstruction = inst[0]
+	} else {
+		log.Printf("could not generate single part system instruction, instead we got %#v", inst)
 	}
 	prompt := input.T
 	prompt.Namespace = brain.TypePrompt
@@ -168,10 +176,15 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	if err != nil {
 		return &GeminiError{e: err}, err
 	}
-
-	result, err := g.chat.SendMessage(ctx, genai.Part{
-		Text: input.Text().Data,
+	content, err := g.getHistory(sv, 0)
+	if err != nil {
+		return &GeminiError{e: err}, err
+	}
+	content = append(content, &genai.Content{
+		Role:  genai.RoleUser,
+		Parts: []*genai.Part{{Text: input.Text().Data}},
 	})
+	result, err := g.generator.GenerateContent(ctx, g.model, content, cfg)
 	if err != nil {
 		return &GeminiError{e: err}, err
 	}
@@ -183,12 +196,15 @@ func (g *Gemini) Think(ctx context.Context, sv brain.SignVerifier, input brain.R
 	err = resp.Sign(sv)
 	if err == nil {
 		log.Printf("Response: %s\n", resp.Text().Data)
+		if !input.Stateless {
+			g.history.AppendInPlace(resp.Prompt(true), resp.Thought(true))
+		}
 	}
 	return resp, err
 }
 
 // Evaluate audits another brain's output
-func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response) (brain.Decision, error) {
+func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput brain.Response, stateless bool) (brain.Decision, error) {
 	now := time.Now()
 	defer func() {
 		log.Printf("Evaluate took: %v", time.Since(now))
@@ -216,7 +232,15 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	// s, _ := json.MarshalIndent(cfg, " ", " ")
 	// log.Printf("using model instructions: %s", s)
 
-	result, err := g.generator.GenerateContent(ctx, "gemini-pro-latest", genai.Text(peerOutput.Describe(sv)), cfg)
+	content, err := g.getHistory(sv, 0)
+	if err != nil {
+		return &brain.ErrorDecision{E: err}, err
+	}
+	content = append(content, &genai.Content{
+		Role:  genai.RoleUser,
+		Parts: []*genai.Part{{Text: peerOutput.Describe(sv)}},
+	})
+	result, err := g.generator.GenerateContent(ctx, "gemini-pro-latest", content, cfg)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
@@ -249,5 +273,10 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		return prev, err
 	}
 	err = prev.Sign(sv)
+	if err == nil && !stateless {
+		gp := prev.GenesisPrompt()
+		p := gp.NextUnsigned(peerOutput.Describe(sv))
+		g.history.AppendInPlace(p, textBlock)
+	}
 	return prev, err
 }
