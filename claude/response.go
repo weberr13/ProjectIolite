@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -136,6 +137,7 @@ func (r *ClaudeResponse) Sign(sv brain.SignVerifier) error {
 
 func (r *ClaudeResponse) Verify(sv brain.SignVerifier) error {
 	if r.cot == nil || r.thought == nil {
+		log.Printf("UNSIGNED: %#v", r)
 		return brain.ErrUnsigned
 	}
 	var err error

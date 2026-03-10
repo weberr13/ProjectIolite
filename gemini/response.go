@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/weberr13/ProjectIolite/brain"
@@ -121,6 +122,7 @@ func (r *GeminiResponse) Sign(sv brain.SignVerifier) error {
 
 func (r *GeminiResponse) Verify(sv brain.SignVerifier) error {
 	if r.cot == nil || r.thought == nil {
+		log.Printf("UNSIGNED: %#v", r)
 		return brain.ErrUnsigned
 	}
 	var err error

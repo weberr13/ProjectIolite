@@ -117,9 +117,9 @@ func setupRouter(backend *brain.Whole, sv brain.SignVerifier) *chi.Mux {
 		})
 		r.Post("/think", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
-				Prompt   string   `json:"prompt"`
-				Strategy []string `json:"strategy"`
-				Stateless bool `json:"stateless"`
+				Prompt    string   `json:"prompt"`
+				Strategy  []string `json:"strategy"`
+				Stateless bool     `json:"stateless"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
@@ -144,6 +144,11 @@ func setupRouter(backend *brain.Whole, sv brain.SignVerifier) *chi.Mux {
 				switch decision.IsError() {
 				case brain.ErrNoConsensus:
 					w.WriteHeader(http.StatusConflict)
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(decision)
+					return
+				case brain.ErrSchemaColapse:
+					w.WriteHeader(http.StatusUnprocessableEntity)
 					w.Header().Set("Content-Type", "application/json")
 					json.NewEncoder(w).Encode(decision)
 					return

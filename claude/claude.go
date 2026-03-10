@@ -92,8 +92,11 @@ func (m *Claude) Chime(ctx context.Context, sv brain.SignVerifier, c brain.Chime
 }
 
 func (c *Claude) getHistory(sv brain.SignVerifier, start int) ([]anthropic.MessageParam, error) {
+	start = min(len(c.history), start)
+
+	log.Printf("prepending history of %d\n", len(c.history)-start)
 	content := []anthropic.MessageParam{}
-	for i := min(len(c.history), start); i < len(c.history); i++ {
+	for i := start; i < len(c.history); i++ {
 		if err := c.history[i].Verify(sv); err != nil {
 			return nil, err
 		}
@@ -432,9 +435,14 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	}
 	// STITCHING: Link Claude's audit to peer's Text Response
 	textblock.PrevSignature = peerOutput.Text().Signature
-
+	err = textblock.Sign(sv)
+	if err != nil {
+		prev.SetError(err)
+		return prev, err
+	}
 	err = prev.Add("claude", allThoughts, textblock, sv, allToolRequests, allToolReplies)
 	if err != nil {
+		prev.SetError(err)
 		return prev, err
 	}
 	err = prev.Sign(sv)
@@ -442,9 +450,15 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		log.Printf("failed to sign Decision: %s", err)
 	}
 	if err == nil && !stateless {
+		log.Printf("saving state to history")
 		gp := prev.GenesisPrompt()
 		p := gp.NextUnsigned(peerOutput.Describe(sv))
-		c.history.AppendInPlace(p, textblock)
+		err = p.Sign(sv)
+		if err != nil {
+			prev.SetError(err)
+		} else {
+			c.history.AppendInPlace(p, textblock)
+		}
 	}
 	return prev, err
 }

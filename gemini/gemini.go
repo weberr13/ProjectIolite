@@ -134,8 +134,11 @@ func (g *Gemini) genConfig() *genai.GenerateContentConfig {
 }
 
 func (g *Gemini) getHistory(sv brain.SignVerifier, start int) ([]*genai.Content, error) {
+	start = min(len(g.history), start)
+	log.Printf("prepending history of %d\n", len(g.history)-start)
+
 	content := []*genai.Content{}
-	for i := min(len(g.history), start); i < len(g.history); i++ {
+	for i := start; i < len(g.history); i++ {
 		if err := g.history[i].Verify(sv); err != nil {
 			return nil, err
 		}
@@ -212,7 +215,6 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if g.cl == nil || g.generator == nil {
 		return &brain.ErrorDecision{E: errors.New("gemini client not initialized")}, errors.New("gemini client not initialized")
 	}
-	// log.Printf("evaluating peer output %s", peerOutput.Describe(sv))
 	cfg := g.genConfig()
 	cfg.Temperature = &HighTemp
 	cfg.ThinkingConfig.ThinkingLevel = genai.ThinkingLevelHigh
@@ -222,16 +224,12 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	// } else {
 	cfg.CandidateCount = 1
 	instruction := genai.Text(brain.GenerateEvalPromptText(sv, false))
-	// }
 	if len(instruction) == 1 {
 		cfg.SystemInstruction = instruction[0]
 		cfg.Tools = append(cfg.Tools, &genai.Tool{CodeExecution: &genai.ToolCodeExecution{}})
 	} else {
 		log.Printf("could not generate single part system instruction, instead we got %#v", instruction)
 	}
-	// s, _ := json.MarshalIndent(cfg, " ", " ")
-	// log.Printf("using model instructions: %s", s)
-
 	content, err := g.getHistory(sv, 0)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
@@ -244,9 +242,6 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
 	}
-	// s, _ = json.MarshalIndent(result, " ", " ")
-	// log.Printf("got result: %s", s)
-	// log.Printf("creating new decision struct")
 	prev, err := NewDecision(peerOutput, sv)
 	if err != nil {
 		return &brain.ErrorDecision{E: err}, err
@@ -266,8 +261,11 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 		textBlock = brain.NewUnsigned(result.Text(), brain.TypeText)
 		textBlock.PrevSignature = peerOutput.Prompt().Signature
 	}
-
-	// END TODO
+	err = textBlock.Sign(sv)
+	if err != nil {
+		prev.SetError(err)
+		return prev, err
+	}
 	err = prev.Add("gemini", allThoughts, textBlock, sv)
 	if err != nil {
 		return prev, err
@@ -276,7 +274,12 @@ func (g *Gemini) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 	if err == nil && !stateless {
 		gp := prev.GenesisPrompt()
 		p := gp.NextUnsigned(peerOutput.Describe(sv))
-		g.history.AppendInPlace(p, textBlock)
+		err = p.Sign(sv)
+		if err != nil {
+			prev.SetError(err)
+		} else {
+			g.history.AppendInPlace(p, textBlock)
+		}
 	}
 	return prev, err
 }
