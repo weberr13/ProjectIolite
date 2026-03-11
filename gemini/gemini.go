@@ -81,6 +81,18 @@ func New(ctx context.Context, apikey string, opts ...Option) (*Gemini, error) {
 	return g, nil
 }
 
+func (m *Gemini) Lacuna(ctx context.Context, sv brain.SignVerifier, l brain.Lacuna) error {
+	p, err := brain.GenerateLacunaPrompt(ctx, sv, l)
+	if err != nil {
+		return err
+	}
+	resp, err := m.Think(ctx, sv, brain.Request{T: p})
+	if err != nil {
+		return err
+	}
+	return brain.ParseLacunaReponse(ctx, sv, resp.Text().Data)
+}
+
 func (m *Gemini) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerifier) ([]brain.SignedHydration, error) {
 	p, err := brain.GenerateDreamPrompt(ctx, spec, sv)
 	if err != nil {

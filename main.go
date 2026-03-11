@@ -8,10 +8,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -66,35 +68,79 @@ func setupRouter(backend *brain.Whole, sv brain.SignVerifier) *chi.Mux {
 	setupDocs(r)
 	r.Route("/v1", func(r chi.Router) {
 		r.Patch("/hydration", func(w http.ResponseWriter, r *http.Request) {
-			var req brain.SignedHydration
-			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
-				return
-			}
-			if err := req.Verify(sv); err != nil {
-				http.Error(w, fmt.Sprintf("invalid request validation failure: %s", err.Error()), http.StatusBadRequest)
-				return
-			}
 			hemisphere := "right"
 			// Read the "brain" query parameter from the URL
 
 			hp := r.URL.Query().Get("brain")
 			if hp != "" {
-				if hp != "left" && hp != "right" {
-					http.Error(w, "invalid brain parameter: must be 'left' or 'right'", http.StatusBadRequest)
+				if hp != "left" && hp != "right" && hp != "both" {
+					http.Error(w, "invalid brain parameter: must be 'left' or 'right' or 'both", http.StatusBadRequest)
 					return
 				}
 				hemisphere = hp
 			}
+			bodyData, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
+				return
+			}
+			log.Printf("got hydration request %s\n", bodyData)
+			switch {
+			case strings.Contains(string(bodyData), `"PublicKey":`):
+				log.Printf("hydration appears to be signed, verifying it\n")
+				var req brain.SignedHydration
+				if err := json.Unmarshal(bodyData, &req); err != nil {
+					http.Error(w, "invalid request, check json body", http.StatusBadRequest)
+					return
+				}
+				if err := req.Verify(sv); err != nil {
+					http.Error(w, fmt.Sprintf("invalid request validation failure: %s", err.Error()), http.StatusBadRequest)
+					return
+				}
 
-			err := backend.Wake(r.Context(), req, hemisphere)
+				err := backend.Wake(r.Context(), req, hemisphere)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusAccepted)
+			default:
+				log.Printf("accepting unsigned hydration\n")
+				var req brain.Hydration
+				if err := json.Unmarshal(bodyData, &req); err != nil {
+					http.Error(w, "invalid request, check json body", http.StatusBadRequest)
+					return
+				}
+				sh := brain.SignedHydration{
+					Hydration: req,
+				}
+				err := sh.Sign(sv)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("invalid request validation failure: %s", err.Error()), http.StatusBadRequest)
+					return
+				}
+				err = backend.Wake(r.Context(), sh, hemisphere)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusAccepted)
+			}
+		})
+		r.Get("/hydration", func(w http.ResponseWriter, r *http.Request) {
+		})
+		r.Post("/glossary", func(w http.ResponseWriter, r *http.Request) {
+			var req brain.Lacuna
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid request, check json body", http.StatusBadRequest)
+				return
+			}
+			err := backend.Lookup(r.Context(), req)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			w.WriteHeader(http.StatusAccepted)
-		})
-		r.Get("/hydration", func(w http.ResponseWriter, r *http.Request) {
 		})
 		r.Patch("/glossary", func(w http.ResponseWriter, r *http.Request) {
 			var req brain.ChimetricCorrection

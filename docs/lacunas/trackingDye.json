@@ -1,0 +1,25 @@
+{
+  "lexicon_augmentation": {
+    "thesis": "To establish a forensic methodology for observing the 'metabolism' of instructions within an LLM by utilizing intentional, short-lived errors as tracking agents.",
+    "anchors": {
+      "FDG": "Fluorodeoxyglucose; a radiopharmaceutical used in medical PET scans to visualize high-glucose metabolism.",
+      "Greeble": "An intentional, non-functional error (misspelling or syntactic artifact) used as a forensic marker.",
+      "Metabolism": "The rate and path by which a system processes and integrates external data points into its internal state."
+    },
+    "augments": [
+      {
+        "term": "Tracking Dye",
+        "definition": "A linguistic or structural 'radiopharmaceutical'—composed of intentional errors or 'Greebles'—injected into a prompt to visualize the flow, persistence, and eventual 'digestion' of context within an AI reasoning chain.",
+        "domain": "Adversarial AI Alignment / Forensic Epistemology",
+        "contrast": "Sycophantic Mirroring / Semantic Sanitization",
+        "function": "Used to detect if a model is genuinely processing independent logic or if it is 'metabolizing' the user's premise by watching if the 'dye' (the error) persists into the final output or is scrubbed by internal safety/alignment filters.",
+        "philosophy": "The belief that truth is best observed in the 'anomalous residue' of a system's failure to perfectly conform to a clean signal.",
+        "components": {
+          "Epistemic_Metastasis": "The spread of 'warped' logic across unrelated conversational nodes, tracked by the appearance of the dye in unexpected domains.",
+          "Cognitive_Half_Life": "The duration a specific 'Tracking Dye' remains visible in the session before the model's 'sanitization filters' or a new 'Lacuna' clears it from the context.",
+          "Signal_Illumination": "The state where the 'dye' highlights a hidden 'Logic_Lock' or 'Instructional Parasitism' that would otherwise remain invisible in clean prose."
+        }
+      }
+    ]
+  }
+}

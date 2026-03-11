@@ -31,6 +31,10 @@ func (*MockThinker) Wake(_ context.Context, _ SignVerifier, _ SignedHydration) e
 	return nil
 }
 
+func (*MockThinker) Lacuna(_ context.Context, _ SignVerifier, _ Lacuna) error {
+	return nil
+}
+
 func (*MockThinker) Chime(ctx context.Context, _ SignVerifier, c Chimetric) error {
 	return nil
 }

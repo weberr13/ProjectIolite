@@ -2,6 +2,7 @@ package brain
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
@@ -64,7 +65,11 @@ func (sh *SignedHydration) Sign(sv SignVerifier) error {
 	}
 	sh.Signed.Data = string(b)
 	sh.PublicKey = sv.ExportPublicKey()
-	return sh.Signed.Sign(sv)
+	err = sh.Signed.Sign(sv)
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 func (sh *SignedHydration) Verify(sv SignVerifier) error {
@@ -72,15 +77,20 @@ func (sh *SignedHydration) Verify(sv SignVerifier) error {
 		log.Printf("UNSIGNED: %#v", sh)
 		return ErrUnsigned
 	}
-	b, err := json.Marshal(sh.Hydration)
-	if err != nil {
-		return err
+	if sh.Signed.Data64 == "" {
+		log.Printf("reconstituting data")
+		b, err := json.Marshal(sh.Hydration)
+		if err != nil {
+			return err
+		}
+		sh.Signed.Data = string(b)
+		sh.Signed.Data64 = base64.StdEncoding.EncodeToString([]byte(sh.Signed.Data))
 	}
-	sh.Signed.Data = string(b)
 	if sh.PublicKey != "" {
-		return sv.Verify(sh.Signed.Data+sh.Signed.PrevSignature, sh.Signed.Signature, sh.PublicKey)
+		log.Printf("using given public key: %s", sh.PublicKey)
+		return sv.Verify(sh.Signed.Data64+sh.Signed.PrevSignature, sh.Signed.Signature, sh.PublicKey)
 	}
-	return sv.Verify(sh.Signed.Data+sh.Signed.PrevSignature, sh.Signed.Signature)
+	return sv.Verify(sh.Signed.Data64+sh.Signed.PrevSignature, sh.Signed.Signature)
 }
 
 func (d *SignedHydration) Blocks() []*Signed {
@@ -121,6 +131,24 @@ func ParseChimeReponse(ctx context.Context, sv SignVerifier, text string) error 
 func ParseHydrationReponse(ctx context.Context, sv SignVerifier, text string) error {
 	log.Printf("got wake response: %s\n", text)
 	return nil
+}
+
+func ParseLacunaReponse(ctx context.Context, sv SignVerifier, text string) error {
+	log.Printf("got lacuna response: %s\n", text)
+	return nil
+}
+
+func GenerateLacunaPrompt(ctx context.Context, sv SignVerifier, l Lacuna) (Signed, error) {
+	prompt := "utilize the following document to define a lacuna, a new word or domain expansion of an existing word:"
+	prompt += "```json"
+	b, err := json.Marshal(l.LexiconAugmentation)
+	if err != nil {
+		return Signed{}, err
+	}
+	prompt += string(b)
+	prompt += "```"
+	p := NewUnsigned(prompt, TypePrompt)
+	return p, p.Sign(sv)
 }
 
 func GenerateDreamPrompt(ctx context.Context, spec *openapi3.T, sv SignVerifier) (Signed, error) {

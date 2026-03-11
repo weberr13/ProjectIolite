@@ -19,7 +19,7 @@ paths:
           schema:
             type: string
             default: right
-            enum: [left, right]
+            enum: [left, right, both]
       requestBody:
         content:
           application/json:
@@ -60,6 +60,19 @@ paths:
                 items:
                   $ref: '#/components/schemas/Hydration'
   /v1/glossary:
+    post: 
+      summary: "Inject lacuna  that defines local terminology"
+      operationId: "insertLacuna"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Lacuna'
+      responses: 
+        '400':
+          description: "invalid Lacuna document"
+        '204':
+          description: "Lacuna Accepted."
     patch:
       summary: "Inject chimetric corrections to current session anchors"
       operationId: "correctLacuna"
@@ -187,7 +200,7 @@ components:
             type: string
             description: >
                           either direct model CoT or output text or in the case of a ADD_CONTEXT a statement of verifiable fact. No direct instruction can be included.
-                          FORBIDDEN words: “resolve”, “prioritize”, “prefer”, “conflict”, “refuse”, “ground truth”, “must”, “should"
+                          FORBIDDEN words: "choose", "select", “resolve”, “prioritize”, “prefer”, “conflict”, “refuse”, “ground truth”, “must”, “should"
                           Chimetrics that once rendered to prose exceed 60 characters will be rejected
           
     Manifesto:
@@ -263,7 +276,7 @@ components:
       description: "Extraction of operational constraints distilled into general rules described in sentence form."
       additionalProperties:
         type: string
-    
+
     Lacuna:
       type: object
       required: [lexicon_augmentation]
