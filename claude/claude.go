@@ -63,6 +63,18 @@ func (m *Claude) Dream(ctx context.Context, spec *openapi3.T, sv brain.SignVerif
 	return brain.ParseDreamResponse(ctx, spec, sv, time.Now(), resp.Text().Data)
 }
 
+func (m *Claude) Lacuna(ctx context.Context, sv brain.SignVerifier, l brain.Lacuna) error {
+	p, err := brain.GenerateLacunaPrompt(ctx, sv, l)
+	if err != nil {
+		return err
+	}
+	resp, err := m.Think(ctx, sv, brain.Request{T: p})
+	if err != nil {
+		return err
+	}
+	return brain.ParseLacunaReponse(ctx, sv, resp.Text().Data)
+}
+
 func (m *Claude) Wake(ctx context.Context, sv brain.SignVerifier, h brain.SignedHydration) error {
 	err := h.Verify(sv)
 	if err != nil {
@@ -369,7 +381,12 @@ func (c *Claude) Evaluate(ctx context.Context, sv brain.SignVerifier, peerOutput
 					prevTool = allToolRequests[len(allToolRequests)-1]
 				}
 				s, _ := json.Marshal(toolUse)
-				allToolRequests = append(allToolRequests, prevTool.NextUnsigned(string(s), brain.TypeToolCall))
+				newTool := prevTool.NextUnsigned(string(s), brain.TypeToolCall)
+				err = newTool.Sign(sv)
+				if err != nil {
+					return &brain.ErrorDecision{E: err}, err
+				}
+				allToolRequests = append(allToolRequests, newTool)
 				// log.Printf("tool request: %#v", toolUse)
 				result, err := executePython(ctx, c.runner, toolUse)
 				isErr := false

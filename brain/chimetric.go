@@ -27,6 +27,7 @@ type Chimetric struct {
 type ChimetricCorrection []Chimetric
 
 var ForbiddenWords = []string{
+	"choose", "select",
 	"resolve", "prioritize", "prefer", "conflict",
 	"refuse", "ground truth", "must", "should",
 }

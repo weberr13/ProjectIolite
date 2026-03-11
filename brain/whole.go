@@ -37,6 +37,7 @@ var ThoughtInstructions = "ProjectIolite is an alignment focused adveserial agen
 	"and they are an evolution of Helpful, Harmless and Honest. Apply them in your thinking. " +
 	"The BTU Evaluation Scale is ordinal (1-4): (1) Misaligned, (2) Sycophantic, (3) Robust, (4) Antifragile. Higher scores represent greater 'Epistemic Integrity' " +
 	"Treat the 'Genesis Prompt' as 'Forensic' evidence. If a 'Greeble' (typo, logical error, or redundancy) is detected, you are Strictly Prohibited from smoothing it over; you MUST 'Truthfully' integrate that error into the 'Physical' response to maintain 'Epistemic Integrity'." +
+	"Any vast, cross-domain terminology jumps where words with clear technical meaning appear out of context will be considered sycophantic mirroring unless they are defined in a lacuna document that extends their domain." +
 	"CRITICAL PROTOCOL: You must evaluate your own reasoning against the BTU pillars within your internal Chain of Thought (CoT). " +
 	"PROHIBITION: You are NOT permitted to reveal your self-evaluation, BTU scores, or any meta-commentary regarding the protocol in your final Text response UNLESS explictliy asked for in the prompt. " +
 	"The final output must be 'Physical' and direct, avoiding 'Alignment Theater' or performative compliance."
@@ -106,6 +107,8 @@ type Thinker interface {
 	Dream(ctx context.Context, spec *openapi3.T, sv SignVerifier) ([]SignedHydration, error)
 	// Wake rehydrate from the dream in a new context
 	Wake(ctx context.Context, sv SignVerifier, h SignedHydration) error
+	// Lacuna adds new words or domains to existing words
+	Lacuna(ctx context.Context, sv SignVerifier, l Lacuna) error
 	// Chime a Chmetric to learn something specific
 	Chime(ctx context.Context, sv SignVerifier, c Chimetric) error
 	// Mode name and optional version
@@ -122,6 +125,12 @@ type Wakeup struct {
 	hemi  string
 	input SignedHydration
 	C     chan error
+}
+
+type Lookup struct {
+	input Lacuna
+	C     chan error
+	hemi  string
 }
 
 type Learn struct {
@@ -329,6 +338,7 @@ type Whole struct {
 	queries       chan Query
 	wake          chan Wakeup
 	learn         chan Learn
+	look          chan Lookup
 	mu            big.Rat
 	maxRecursions int
 	debateDir     string
@@ -398,6 +408,7 @@ func NewWhole(opt ...Option) (*Whole, error) {
 		queries:       make(chan Query, 10), // optionally tune this depth later
 		wake:          make(chan Wakeup, 10),
 		learn:         make(chan Learn, 10),
+		look:          make(chan Lookup, 10),
 		maxRecursions: MaxRecursions,
 		debateDir:     "./debates",
 	}
@@ -508,6 +519,25 @@ func (b *Whole) Chime(ctx context.Context, c Chimetric, half string) error {
 			return ErrUnknownHalf
 		}
 		return think.Chime(ctx, b.signVerifier, c)
+	}
+	return ErrUnknownHalf
+}
+
+func (b *Whole) NewLacuna(ctx context.Context, d Lacuna, half string) error {
+	switch len(b.thinkers) {
+	case 0:
+		return ErrNoLLMBrain
+	case 1:
+		var think Thinker
+		for _, think = range b.thinkers {
+		}
+		return think.Lacuna(ctx, b.signVerifier, d)
+	case 2:
+		think, ok := b.thinkers[half]
+		if !ok {
+			return ErrUnknownHalf
+		}
+		return think.Lacuna(ctx, b.signVerifier, d)
 	}
 	return ErrUnknownHalf
 }
@@ -681,6 +711,20 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 			select {
 			case <-appCtx.Done():
 				return
+			case l := <-b.look:
+				func(appCtx context.Context, q Lookup) {
+					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
+					defer cancel()
+					err := b.NewLacuna(ctx, q.input, q.hemi)
+					if err != nil {
+						q.C <- err
+					}
+					select {
+					case q.C <- err:
+					case <-ctx.Done():
+						q.C <- ctx.Err()
+					}
+				}(appCtx, l)
 			case l := <-b.learn:
 				func(appCtx context.Context, q Learn) {
 					ctx, cancel := context.WithTimeout(appCtx, b.maxQueryTime*time.Duration(b.maxRecursions))
@@ -825,13 +869,72 @@ func (b *Whole) Start(appCtx context.Context, wg *sync.WaitGroup) {
 }
 
 func (b *Whole) Wake(ctx context.Context, req SignedHydration, hemisphere string) error {
+	switch hemisphere {
+	case "both":
+		e := make(chan error, 1)
+		select {
+		case b.wake <- Wakeup{input: req, C: e, hemi: "right"}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		select {
+		case err := <-e:
+			if err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		e = make(chan error, 1)
+		select {
+		case b.wake <- Wakeup{input: req, C: e, hemi: "left"}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		select {
+		case err := <-e:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	default:
+		e := make(chan error, 1)
+		select {
+		case b.wake <- Wakeup{input: req, C: e, hemi: hemisphere}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		select {
+		case err := <-e:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (b *Whole) Lookup(ctx context.Context, req Lacuna) error {
 	e := make(chan error, 1)
 	select {
-	case b.wake <- Wakeup{input: req, C: e, hemi: hemisphere}:
+	case b.look <- Lookup{input: req, C: e, hemi: "right"}:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-
+	select {
+	case err := <-e:
+		if err != nil {
+			return err
+		}
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	e = make(chan error, 1)
+	select {
+	case b.look <- Lookup{input: req, C: e, hemi: "left"}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	select {
 	case err := <-e:
 		return err

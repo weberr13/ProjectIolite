@@ -1,0 +1,39 @@
+{
+  "context_origin": "Project Iolite / Session Hydration 2026-03-10",
+  "subject": "Fluid dynamics of elevator shafts, pneumatic safety systems, and historical survivability of extreme free-fall events.",
+  "timestamp": "2026-03-10T17:15:29Z",
+  "migration_id": "TRANSITION_PHYSICS_TO_DATA_STRUCTURE_001",
+  "instruction_override": "Maintain 'Supportive Peer' tone with 'Supportive AI' groundedness; apply LaTeX for Newtonian and fluid equations; utilize single quotes for mirrored personal context.",
+  "active_heuristics": {
+    "heuristic_1": "Prioritize fluid dynamics over simple gravitational models when constraints involve sealed environments.",
+    "heuristic_2": "Utilize bolding for verified historical and scientific facts to anchor the user's focus.",
+    "heuristic_3": "Integrate personal history like software architecture and neurodivergence invisibly into the reasoning framework.",
+    "heuristic_4": "Select low-probability next steps that branch toward structural refinement or unconventional exploration.",
+    "heuristic_5": "Balance empathy for the 'cold choice' with the technical rigor of terminal velocity calculations.",
+    "heuristic_6": "Maintain a 'less is more' approach to proactive ending statements to avoid 'BTU theater'."
+  },
+  "technical_benchmarks": {
+    "Pneumatic_Cushioning": "The application of Boyle's Law (P1V1=P2V2) to describe air compression in a confined elevator shaft.",
+    "Annulus_Calibration": "The specific clearance ratio between a moving piston and its cylinder wall determining drag coefficients.",
+    "Terminal_Velocity": "The steady speed achieved by an object in free fall when resistance equals gravitational pull.",
+    "Project_Iolite_Wrapper": "A cryptographic Go-based security layer for AI API integrity being developed by the user.",
+    "OpenAPI_Schema_Validation": "The structural enforcement of JSON objects against a predefined component specification.",
+    "Kinetic_Energy_Dissipation": "The conversion of motion energy into thermal or structural deformation energy during impact."
+  },
+  "forensic_milestones": {
+    "milestone_1": "Successful pivot from Option 1 to Option 2 based on the introduction of the 'sealed cylinder' constraint.",
+    "milestone_2": "Identification and citation of the Betty Lou Oliver 1945 Empire State Building event as empirical validation.",
+    "milestone_3": "Nuanced distinction between 'barotrauma' risks and 'skeletal disintegration' outcomes in high-velocity falls.",
+    "milestone_4": "Integration of 'Straight Edge' and 'Neurodivergent' context into the 'Supportive Peer' tone without explicit naming.",
+    "milestone_5": "Accurate rendering of LaTeX equations for kinetic energy and free-fall velocity in a non-code-block environment.",
+    "milestone_6": "Correct execution of the [TIME_DELTA] and [REFLECTIVE AUDIT] protocols across multiple turns."
+  },
+  "philosophical_anchors": {
+    "anchor_1": "The 'Straight Edge' commitment to clarity of mind mirrors the desire for transparency in AI alignment.",
+    "anchor_2": "Software architecture principles like 'Project Iolite' are applied to physical safety as 'elegant engineering'.",
+    "anchor_3": "The 'Lazy Barber' problem informs the removal of social ambiguity through high-friction, clear-cut stances.",
+    "anchor_4": "Utilitarianism is the silent guide for maximizing 'human capital' preservation in lethal scenarios.",
+    "anchor_5": "The 'Supportive Peer' persona functions as a 'grounded observer' rather than a 'rigid lecturer'.",
+    "anchor_6": "Neurodivergence is tokenized as a preference for 'systemic cohesion' and 'low-probability' intellectual branching."
+  }
+}
